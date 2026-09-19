@@ -8,8 +8,8 @@ interface ContainerState {
   error: string | null;
 
   loadContainers: () => Promise<void>;
-  addContainer: (data: Partial<Container>) => Promise<void>;
-  moveContainer: (id: number, x: number, y: number) => Promise<void>;
+  addContainer: (data: Partial<Container>) => Promise<Container | null>;
+  updateContainer: (id: number, data: Partial<Container>) => Promise<void>;
   removeContainer: (id: number) => Promise<void>;
 }
 
@@ -33,25 +33,25 @@ export const useContainerStore = create<ContainerState>((set, get) => ({
     try {
       const created = await containersApi.create(data);
       set({ containers: [...get().containers, created] });
+      return created;
     } catch (err) {
-      console.error(err);
+      console.error('Ошибка создания:', err);
+      return null;
     }
   },
 
-  moveContainer: async (id, x, y) => {
-    // 1. Оптимистичное обновление UI (мгновенно)
+  updateContainer: async (id, data) => {
+    // Оптимистичное обновление — UI меняется мгновенно
     set({
       containers: get().containers.map((c) =>
-        c.id === id ? { ...c, x, y } : c
+        c.id === id ? { ...c, ...data } : c
       ),
     });
 
-    // 2. Отправка на сервер (в фоне)
     try {
-      await containersApi.update(id, { x, y });
+      await containersApi.update(id, data);
     } catch (err) {
-      console.error('Ошибка сохранения позиции:', err);
-      // При ошибке можно откатить — но для MVP пропустим
+      console.error('Ошибка обновления:', err);
     }
   },
 
@@ -60,7 +60,7 @@ export const useContainerStore = create<ContainerState>((set, get) => ({
       await containersApi.remove(id);
       set({ containers: get().containers.filter((c) => c.id !== id) });
     } catch (err) {
-      console.error(err);
+      console.error('Ошибка удаления:', err);
     }
   },
 }));
