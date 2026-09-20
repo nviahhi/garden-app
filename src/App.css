@@ -260,3 +260,29 @@ button {
 .field-narrow {
   max-width: 72px;
 }
+
+.canvas-toolbar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.radio {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #2e4a2e;
+  cursor: pointer;
+}
+
+.radio input {
+  cursor: pointer;
+}
