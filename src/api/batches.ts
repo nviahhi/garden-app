@@ -33,6 +33,11 @@ export const batchesApi = {
     return data;
   },
 
+  germinate: async (id: number, count: number): Promise<{ created: number; plants: Plant[] }> => {
+    const { data } = await api.post(`/batches/${id}/germinate`, { count });
+    return data;
+  },
+
   remove: async (id: number): Promise<void> => {
     await api.delete(`/batches/${id}`);
   },

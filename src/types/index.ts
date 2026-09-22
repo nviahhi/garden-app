@@ -60,3 +60,11 @@ export interface PlantEvent {
   from_container_name?: string | null;
   to_container_name?: string | null;
 }
+
+export const PLANT_STATUS_LABELS: Record<Plant['status'], string> = {
+  seedling: 'Сеянец',
+  growing: 'Растёт',
+  transplanted: 'Пикировано',
+  harvested: 'Собрано',
+  dead: 'Погибло',
+};

@@ -12,6 +12,7 @@ interface BatchState {
   loadPlants: () => Promise<void>;
   createBatch: (payload: CreateBatchPayload) => Promise<boolean>;
   removeBatch: (id: number) => Promise<void>;
+  germinateBatch: (batchId: number, count: number) => Promise<boolean>;
   transplantPlant: (
     id: number,
     to_container_id: number,
@@ -66,6 +67,18 @@ export const useBatchStore = create<BatchState>((set, get) => ({
       });
     } catch (err) {
       console.error('Ошибка удаления партии:', err);
+    }
+  },
+
+  germinateBatch: async (batchId, count) => {
+    try {
+      await batchesApi.germinate(batchId, count);
+      await get().loadBatches();
+      await get().loadPlants();
+      return true;
+    } catch (err) {
+      console.error('Ошибка отметки всходов:', err);
+      return false;
     }
   },
 

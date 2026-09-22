@@ -1,10 +1,12 @@
 import { Stage, Layer, Rect, Text, Group } from 'react-konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useContainerStore } from '../store/useContainerStore';
-import type { Container } from '../types';
+import { useBatchStore } from '../store/useBatchStore';
+import type { Container, Plant, Batch } from '../types';
 import { CanvasGrid } from './CanvasGrid';
 import { ContainerCells } from './ContainerCells';
+import { ContainerPlants } from './ContainerPlants';
 
 const CANVAS_WIDTH = 1200;
 const CANVAS_HEIGHT = 800;
@@ -13,16 +15,26 @@ const GRID_SIZE = 20;
 interface GardenCanvasProps {
   selectedId: number | null;
   onSelect: (id: number | null) => void;
+  onPlantClick?: (plant: Plant) => void;
+  onBatchClick?: (batch: Batch) => void;
 }
 
 function ContainerShape({
   container,
+  plants,
+  batches,
   isSelected,
   onSelect,
+  onPlantClick,
+  onBatchClick,
 }: {
   container: Container;
+  plants: Plant[];
+  batches: Batch[];
   isSelected: boolean;
   onSelect: () => void;
+  onPlantClick?: (plant: Plant) => void;
+  onBatchClick?: (batch: Batch) => void;
 }) {
   const updateContainer = useContainerStore((s) => s.updateContainer);
 
@@ -35,7 +47,9 @@ function ContainerShape({
     updateContainer(container.id, { x, y });
   };
 
-  const hasCells = container.cols && container.rows && container.cols > 0 && container.rows > 0;  
+  const hasCells =
+    container.cols != null && container.rows != null &&
+    container.cols > 0 && container.rows > 0;
 
   return (
     <Group
@@ -87,16 +101,57 @@ function ContainerShape({
         wrap="word"
         ellipsis
       />
+
+      <ContainerPlants
+        container={container}
+        plants={plants}
+        batches={batches}
+        onPlantClick={onPlantClick}
+        onBatchClick={onBatchClick}
+      />
     </Group>
   );
 }
 
-export function GardenCanvas({ selectedId, onSelect }: GardenCanvasProps) {
+export function GardenCanvas({
+  selectedId,
+  onSelect,
+  onPlantClick,
+  onBatchClick,
+}: GardenCanvasProps) {
   const { containers, isLoading, loadContainers } = useContainerStore();
+  const plants = useBatchStore((s) => s.plants);
+  const batches = useBatchStore((s) => s.batches);
+  const loadPlants = useBatchStore((s) => s.loadPlants);
+  const loadBatches = useBatchStore((s) => s.loadBatches);
 
   useEffect(() => {
     loadContainers();
-  }, [loadContainers]);
+    loadPlants();
+    loadBatches();
+  }, [loadContainers, loadPlants, loadBatches]);
+
+  const plantsByContainer = useMemo(() => {
+    const map = new Map<number, Plant[]>();
+    for (const plant of plants) {
+      if (plant.container_id == null) continue;
+      const list = map.get(plant.container_id) ?? [];
+      list.push(plant);
+      map.set(plant.container_id, list);
+    }
+    return map;
+  }, [plants]);
+
+  const batchesByContainer = useMemo(() => {
+    const map = new Map<number, Batch[]>();
+    for (const batch of batches) {
+      if (batch.container_id == null) continue;
+      const list = map.get(batch.container_id) ?? [];
+      list.push(batch);
+      map.set(batch.container_id, list);
+    }
+    return map;
+  }, [batches]);
 
   const handleStageClick = (e: KonvaEventObject<MouseEvent>) => {
     if (e.target === e.target.getStage()) {
@@ -114,8 +169,12 @@ export function GardenCanvas({ selectedId, onSelect }: GardenCanvasProps) {
           <ContainerShape
             key={container.id}
             container={container}
+            plants={plantsByContainer.get(container.id) ?? []}
+            batches={batchesByContainer.get(container.id) ?? []}
             isSelected={selectedId === container.id}
             onSelect={() => onSelect(container.id)}
+            onPlantClick={onPlantClick}
+            onBatchClick={onBatchClick}
           />
         ))}
       </Layer>
