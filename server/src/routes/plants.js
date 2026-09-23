@@ -184,12 +184,13 @@ router.put('/:id/transplant', async (req, res) => {
 });
 
 // PUT /api/plants/:id/status — сменить статус (собрано, погибло и т.д.)
+// PUT /api/plants/:id/status
 router.put('/:id/status', async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
 
-    const allowed = ['seedling', 'growing', 'transplanted', 'harvested', 'dead'];
+    const allowed = ['sown', 'germinated', 'growing', 'transplanted', 'harvested', 'dead'];
     if (!allowed.includes(status)) {
       return res.status(400).json({ error: `status должен быть одним из: ${allowed.join(', ')}` });
     }

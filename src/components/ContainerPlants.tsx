@@ -33,7 +33,7 @@ export function ContainerPlants({
 
   if (!hasPlants && !hasBatches) return null;
 
-  // ===== Режим 1: сетка + растения с cell_index =====
+  // === Режим 1: сетка + растения с cell_index ===
   if (hasGrid && hasPlants) {
     const cols = container.cols!;
     const rows = container.rows!;
@@ -74,29 +74,53 @@ export function ContainerPlants({
     }
   }
 
-  // ===== Режим 2: стопка бейджей по партиям =====
+  // === Режим 2: бейджи по партиям ===
+  // Для каждой партии, у которой есть растения в ЭТОМ контейнере
   const items = batches.map((batch) => {
-    const batchPlantsCount = plants.filter((p) => p.batch_id === batch.id).length;
-    const isGrowing = batchPlantsCount > 0;
+    const localPlants = plants.filter((p) => p.batch_id === batch.id);
 
-    const label = isGrowing
-      ? `🌱 ${batchPlantsCount}/${batch.seeds_count}`
-      : `🌰 ${batch.seeds_count}`;
+    // Нет растений в этом контейнере — показываем как «посеяно»
+    if (localPlants.length === 0) {
+      return {
+        batch,
+        label: `🌰 0/${batch.seeds_count}`,
+        color: '#e0e0e0',
+        onClick: () => onBatchClick?.(batch),
+      };
+    }
+
+    // Партия распределена по горшкам (container_id = null) — локальный счёт
+    const isDistributed = batch.container_id === null;
+    const total = isDistributed ? localPlants.length : batch.seeds_count;
+
+    const germinated = localPlants.filter((p) =>
+      p.status !== 'sown' && p.status !== 'dead'
+    ).length;
+
+    const label = germinated > 0
+      ? `🌱 ${germinated}/${total}`
+      : `🌰 0/${total}`;
 
     return {
       batch,
       label,
-      color: isGrowing ? '#d4e8d4' : '#e0e0e0',
+      color: germinated > 0 ? '#d4e8d4' : '#e0e0e0',
       onClick: () => onBatchClick?.(batch),
     };
   });
 
   if (items.length === 0) return null;
 
+  return renderBadges(container, items);
+}
+
+function renderBadges(
+  container: Container,
+  items: { batch: Batch; label: string; color: string; onClick: () => void }[]
+) {
   return (
     <Group>
       {items.map((item, index) => {
-        // Бейджи стопкой снизу вверх
         const fromBottom = items.length - 1 - index;
         const y =
           container.height -
@@ -137,8 +161,23 @@ function Badge({ containerWidth, y, label, color, onClick }: BadgeProps) {
     onClick();
   };
 
+  const handleMouseEnter = (e: KonvaEventObject<MouseEvent>) => {
+    const stage = e.target.getStage();
+    if (stage) stage.container().style.cursor = 'pointer';
+  };
+
+  const handleMouseLeave = (e: KonvaEventObject<MouseEvent>) => {
+    const stage = e.target.getStage();
+    if (stage) stage.container().style.cursor = 'default';
+  };
+
   return (
-    <Group onClick={handleClick} onTap={handleClick}>
+    <Group
+      onClick={handleClick}
+      onTap={handleClick}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
       <Rect
         x={x}
         y={y}

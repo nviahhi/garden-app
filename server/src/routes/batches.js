@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db');
 
-// GET /api/batches — все партии с количеством растений и именем контейнера
+// GET /api/batches
 router.get('/', async (req, res) => {
   try {
     const result = await pool.query(`
@@ -24,7 +24,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-// GET /api/batches/:id — одна партия + список растений
+// GET /api/batches/:id
 router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -61,9 +61,11 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// POST /api/batches — создать партию
-// Body: { species, variety, sowing_date, seeds_count, container_id, cell_indices?, notes? }
-// Если передан cell_indices — сразу создаём растения для этих ячеек
+// POST /api/batches
+// Body: { species, variety, sowing_date, seeds_count,
+//         container_id?, cell_indices?,      // один контейнер / ячейки
+//         container_ids?,                    // группа горшков
+//         notes? }
 router.post('/', async (req, res) => {
   const client = await pool.connect();
 
@@ -77,6 +79,7 @@ router.post('/', async (req, res) => {
       seeds_count,
       container_id,
       cell_indices,
+      container_ids,
       notes,
     } = req.body;
 
@@ -87,25 +90,24 @@ router.post('/', async (req, res) => {
       });
     }
 
-    // Создаём партию
+    // Определяем основной container_id для партии
+    let batchContainerId = container_id || null;
+    if (Array.isArray(container_ids) && container_ids.length === 1) {
+      batchContainerId = container_ids[0];
+    }
+    // для группы горшков container_id = null
+
     const batchResult = await client.query(
       `INSERT INTO batches (species, variety, sowing_date, seeds_count, container_id, notes)
        VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING *`,
-      [
-        species,
-        variety || null,
-        sowing_date,
-        seeds_count,
-        container_id || null,
-        notes || null,
-      ]
+      [species, variety || null, sowing_date, seeds_count, batchContainerId, notes || null]
     );
 
     const batch = batchResult.rows[0];
-
-    // Если переданы ячейки — создаём растения сразу
     let createdPlants = [];
+
+    // === Режим 1: по ячейкам кассеты ===
     if (Array.isArray(cell_indices) && cell_indices.length > 0) {
       if (!container_id) {
         await client.query('ROLLBACK');
@@ -114,14 +116,12 @@ router.post('/', async (req, res) => {
         });
       }
 
-      // Формируем VALUES ($1,$2,$3,$4,$5), ($1,$2,$6,$7,$5), ...
       const values = cell_indices
         .map((cellIndex, i) => {
           const num = i + 1;
-          // Проверяем, что числа (защита от инъекций)
           const safeCell = Number(cellIndex);
           const safeContainer = Number(container_id);
-          return `(${batch.id}, ${safeContainer}, ${safeCell}, ${num}, 'seedling')`;
+          return `(${batch.id}, ${safeContainer}, ${safeCell}, ${num}, 'sown')`;
         })
         .join(',');
 
@@ -130,6 +130,17 @@ router.post('/', async (req, res) => {
         VALUES ${values}
         RETURNING *
       `);
+      createdPlants = plantsResult.rows;
+    }
+
+    // === Режим 2: по отдельным горшкам (по 1 растению в горшок) ===
+    if (Array.isArray(container_ids) && container_ids.length > 0) {
+      const plantsResult = await client.query(`
+        INSERT INTO plants (batch_id, container_id, cell_index, number, status)
+        SELECT $1, cid, NULL, ROW_NUMBER() OVER (ORDER BY cid), 'sown'
+        FROM unnest($2::int[]) AS cid
+        RETURNING *
+      `, [batch.id, container_ids]);
       createdPlants = plantsResult.rows;
     }
 
@@ -148,9 +159,9 @@ router.post('/', async (req, res) => {
   }
 });
 
-// POST /api/batches/:id/germinate — отметить всходы
-// Body: { count } — сколько растений взошло
-// Создаёт N растений в контейнере партии (россыпью, cell_index = NULL)
+// POST /api/batches/:id/germinate
+// Для россыпи — создаёт N растений сразу со статусом 'germinated'
+// Body: { count }
 router.post('/:id/germinate', async (req, res) => {
   const client = await pool.connect();
 
@@ -165,7 +176,6 @@ router.post('/:id/germinate', async (req, res) => {
       return res.status(400).json({ error: 'Поле count обязательно (>= 1)' });
     }
 
-    // Получаем партию
     const batchResult = await client.query(
       'SELECT * FROM batches WHERE id = $1',
       [id]
@@ -185,20 +195,18 @@ router.post('/:id/germinate', async (req, res) => {
       });
     }
 
-    // Узнаём, сколько растений уже создано (чтобы не дублировать номера)
     const existingResult = await client.query(
       'SELECT COUNT(*)::int AS existing FROM plants WHERE batch_id = $1',
       [id]
     );
     const existingCount = existingResult.rows[0].existing;
 
-    // Создаём N растений
     const plants = [];
     for (let i = 0; i < count; i++) {
       const number = existingCount + i + 1;
       const result = await client.query(
         `INSERT INTO plants (batch_id, container_id, cell_index, number, status)
-         VALUES ($1, $2, NULL, $3, 'seedling')
+         VALUES ($1, $2, NULL, $3, 'germinated')
          RETURNING *`,
         [id, batch.container_id, number]
       );
@@ -221,7 +229,27 @@ router.post('/:id/germinate', async (req, res) => {
   }
 });
 
-// DELETE /api/batches/:id — удалить партию (каскадно удалит растения)
+// PUT /api/batches/:id/mark-germinated
+// Переводит все растения партии со статусом 'sown' в 'germinated'
+router.put('/:id/mark-germinated', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await pool.query(`
+      UPDATE plants
+      SET status = 'germinated', updated_at = NOW()
+      WHERE batch_id = $1 AND status = 'sown'
+      RETURNING *
+    `, [id]);
+
+    res.json({ updated: result.rowCount, plants: result.rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Ошибка отметки всходов' });
+  }
+});
+
+// DELETE /api/batches/:id
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;

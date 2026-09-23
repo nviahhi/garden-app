@@ -15,28 +15,40 @@ export function BatchInfoPanel({
   onSelectBatch,
 }: BatchInfoPanelProps) {
   const removeBatch = useBatchStore((s) => s.removeBatch);
+  const markGerminated = useBatchStore((s) => s.markGerminated);
+  const markPlantGerminated = useBatchStore((s) => s.markPlantGerminated);
   const allBatches = useBatchStore((s) => s.batches);
   const allPlants = useBatchStore((s) => s.plants);
 
-  // Партии того же контейнера
   const siblings = allBatches.filter(
     (b) => b.container_id != null && b.container_id === batch.container_id
   );
 
-  // Растения этой партии — всегда актуальны из стора
   const batchPlants = allPlants
     .filter((p) => p.batch_id === batch.id)
     .sort((a, b) => a.number - b.number);
 
   const plantsCount = batchPlants.length;
-  const remaining = Math.max(0, batch.seeds_count - plantsCount);
-  const canGerminate = remaining > 0;
+  const sownCount = batchPlants.filter((p) => p.status === 'sown').length;
+  const germinatedCount = batchPlants.filter(
+    (p) => p.status !== 'sown' && p.status !== 'dead'
+  ).length;  
+
+  // Кнопка 1: создать растения (если их нет и есть seeds_count)
+  const canCreatePlants = plantsCount === 0 && batch.seeds_count > 0 && batch.container_id != null;
+
+  // Кнопка 2: перевести sown → germinated
+  const canMarkGerminated = sownCount > 0;
 
   const handleDelete = async () => {
     if (confirm(`Удалить партию «${batch.species}${batch.variety ? ' ' + batch.variety : ''}»?`)) {
       await removeBatch(batch.id);
       onClose();
     }
+  };
+
+  const handleMarkGerminated = async () => {
+    await markGerminated(batch.id);
   };
 
   return (
@@ -86,27 +98,29 @@ export function BatchInfoPanel({
         </div>
         <div className="batch-card-row">
           <span className="batch-label">Контейнер:</span>
-          <span>{batch.container_name ?? '—'}</span>
+          <span>{batch.container_name ?? (batch.container_id === null ? 'группа горшков' : '—')}</span>
         </div>
-        <div className="batch-card-row">
-          <span className="batch-label">Растений:</span>
-          <span>{plantsCount} из {batch.seeds_count}</span>
-        </div>
+        {batchPlants.length > 0 && (
+          <div className="batch-card-row">
+            <span className="batch-label">Взошло:</span>
+            <span>{germinatedCount} из {batch.seeds_count}</span>
+          </div>
+        )}
         {batch.notes && (
           <div className="batch-card-notes">{batch.notes}</div>
         )}
       </div>
 
-      {canGerminate && (
+      {canCreatePlants && (
         <button className="btn btn-primary" onClick={() => onGerminate(batch)}>
-          🌱 {plantsCount === 0 ? 'Отметить всходы' : `Добавить ещё (${remaining})`}
+          🌱 Отметить всходы
         </button>
       )}
 
-      {!canGerminate && plantsCount > 0 && (
-        <p className="muted" style={{ textAlign: 'center', fontSize: 12 }}>
-          Все {batch.seeds_count} растений отмечены
-        </p>
+      {canMarkGerminated && (
+        <button className="btn btn-primary" onClick={handleMarkGerminated}>
+          🌱 Отметить всех взошедшими ({sownCount})
+        </button>
       )}
 
       {batchPlants.length > 0 && (
@@ -115,9 +129,25 @@ export function BatchInfoPanel({
           <div className="batch-plants-list">
             {batchPlants.map((p) => (
               <div key={p.id} className="batch-plant-item">
-                <span className="batch-plant-num">#{p.number}</span>
-                <span className="batch-plant-status">
-                  {PLANT_STATUS_LABELS[p.status] ?? p.status}
+                <span className="batch-plant-num">
+                  #{p.number}
+                  {p.container_name && (
+                    <span className="batch-plant-container"> · {p.container_name}</span>
+                  )}
+                </span>
+                <span className="batch-plant-right">
+                  <span className="batch-plant-status">
+                    {PLANT_STATUS_LABELS[p.status] ?? p.status}
+                  </span>
+                  {p.status === 'sown' && (
+                    <button
+                      className="btn-icon-sm"
+                      title="Отметить взошедшим"
+                      onClick={() => markPlantGerminated(p.id)}
+                    >
+                      🌱
+                    </button>
+                  )}
                 </span>
               </div>
             ))}

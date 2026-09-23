@@ -3,11 +3,12 @@ import type { KonvaEventObject } from 'konva/lib/Node';
 import type { Plant } from '../types';
 
 const STATUS_COLORS: Record<Plant['status'], string> = {
-  seedling: '#a5d6a7',
-  growing: '#4caf50',
-  transplanted: '#ffb74d',
-  harvested: '#64b5f6',
-  dead: '#e57373',
+  sown: '#d7ccc8',           // светло-коричневый — посеяно
+  germinated: '#a5d6a7',     // светло-зелёный — взошло
+  growing: '#4caf50',        // зелёный — растёт
+  transplanted: '#ffb74d',   // оранжевый
+  harvested: '#64b5f6',      // синий
+  dead: '#e57373',           // красный
 };
 
 interface PlantMarkerProps {

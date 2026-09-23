@@ -439,3 +439,114 @@ button {
   color: #6b8e6b;
   margin-top: 2px;
 }
+
+.pots-list {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid #e0e0d0;
+  border-radius: 6px;
+  padding: 4px;
+  margin-top: 4px;
+  background: #fafaf5;
+}
+
+.pot-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #2e4a2e;
+}
+
+.pot-checkbox:hover {
+  background: #f0f0e8;
+}
+
+.pot-checkbox input {
+  cursor: pointer;
+}
+
+.pot-type {
+  margin-left: auto;
+  font-size: 11px;
+  color: #6b8e6b;
+}
+
+.batch-plant-container {
+  font-size: 11px;
+  color: #6b8e6b;
+  font-weight: normal;
+}
+
+.field-readonly {
+  background: #f0f0e8;
+  color: #6b8e6b;
+  cursor: not-allowed;
+}
+
+.batch-plant-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-icon-sm {
+  background: transparent;
+  border: 1px solid #d0d0c0;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 12px;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+  line-height: 1;
+}
+
+.btn-icon-sm:hover {
+  background: #e8f5e9;
+  border-color: #4a7c4a;
+}
+
+/* Вкладки в сайдбаре */
+.sidebar-tabs {
+  display: flex;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 3px;
+  border-radius: 6px;
+}
+
+.sidebar-tab {
+  flex: 1;
+  padding: 6px 8px;
+  background: transparent;
+  border: none;
+  color: #a5c8a5;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 4px;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+
+.sidebar-tab:hover {
+  color: #e8f5e9;
+}
+
+.sidebar-tab.is-active {
+  background: #4a7c4a;
+  color: white;
+}
+
+/* Иконка в списке партий */
+.list-item-icon {
+  display: inline-block;
+  margin-right: 6px;
+  font-size: 14px;
+}

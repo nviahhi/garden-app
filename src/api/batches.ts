@@ -10,6 +10,7 @@ export interface CreateBatchPayload {
   seeds_count: number;
   container_id?: number;
   cell_indices?: number[];
+  container_ids?: number[];      // ← группа горшков
   notes?: string;
 }
 
@@ -35,6 +36,11 @@ export const batchesApi = {
 
   germinate: async (id: number, count: number): Promise<{ created: number; plants: Plant[] }> => {
     const { data } = await api.post(`/batches/${id}/germinate`, { count });
+    return data;
+  },
+
+  markGerminated: async (id: number): Promise<{ updated: number; plants: Plant[] }> => {
+    const { data } = await api.put(`/batches/${id}/mark-germinated`);
     return data;
   },
 

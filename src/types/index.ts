@@ -24,7 +24,6 @@ export interface Batch {
   notes: string | null;
   created_at: string;
   plants_count?: number;
-  // джойны
   container_name?: string | null;
   container_type?: string | null;
 }
@@ -35,11 +34,10 @@ export interface Plant {
   container_id: number | null;
   cell_index: number | null;
   number: number;
-  status: 'seedling' | 'growing' | 'transplanted' | 'harvested' | 'dead';
+  status: 'sown' | 'germinated' | 'growing' | 'transplanted' | 'harvested' | 'dead';
   notes: string | null;
   created_at: string;
   updated_at: string;
-  // джойны, приходят из API
   species?: string;
   variety?: string | null;
   sowing_date?: string;
@@ -62,7 +60,8 @@ export interface PlantEvent {
 }
 
 export const PLANT_STATUS_LABELS: Record<Plant['status'], string> = {
-  seedling: 'Сеянец',
+  sown: 'Посеяно',
+  germinated: 'Взошло',
   growing: 'Растёт',
   transplanted: 'Пикировано',
   harvested: 'Собрано',

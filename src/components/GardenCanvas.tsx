@@ -17,6 +17,7 @@ interface GardenCanvasProps {
   onSelect: (id: number | null) => void;
   onPlantClick?: (plant: Plant) => void;
   onBatchClick?: (batch: Batch) => void;
+  highlightedContainerIds?: Set<number>;
 }
 
 function ContainerShape({
@@ -24,6 +25,7 @@ function ContainerShape({
   plants,
   batches,
   isSelected,
+  isHighlighted,
   onSelect,
   onPlantClick,
   onBatchClick,
@@ -32,6 +34,7 @@ function ContainerShape({
   plants: Plant[];
   batches: Batch[];
   isSelected: boolean;
+  isHighlighted: boolean;
   onSelect: () => void;
   onPlantClick?: (plant: Plant) => void;
   onBatchClick?: (batch: Batch) => void;
@@ -64,11 +67,11 @@ function ContainerShape({
         width={container.width}
         height={container.height}
         fill="#e8f5e9"
-        stroke={isSelected ? '#2e7d32' : '#4a7c4a'}
-        strokeWidth={isSelected ? 3 : 2}
+        stroke={isSelected || isHighlighted ? '#2e7d32' : '#4a7c4a'}
+        strokeWidth={isSelected || isHighlighted ? 3 : 2}
         cornerRadius={6}
-        shadowBlur={5}
-        shadowColor="rgba(0,0,0,0.2)"
+        shadowBlur={isHighlighted ? 14 : 5}
+        shadowColor={isHighlighted ? '#4caf50' : 'rgba(0,0,0,0.2)'}
       />
 
       {hasCells && (
@@ -118,6 +121,7 @@ export function GardenCanvas({
   onSelect,
   onPlantClick,
   onBatchClick,
+  highlightedContainerIds,
 }: GardenCanvasProps) {
   const { containers, isLoading, loadContainers } = useContainerStore();
   const plants = useBatchStore((s) => s.plants);
@@ -144,14 +148,35 @@ export function GardenCanvas({
 
   const batchesByContainer = useMemo(() => {
     const map = new Map<number, Batch[]>();
+
+    // 1. Партии с явным container_id (россыпь, ячейки)
     for (const batch of batches) {
-      if (batch.container_id == null) continue;
-      const list = map.get(batch.container_id) ?? [];
-      list.push(batch);
-      map.set(batch.container_id, list);
+      if (batch.container_id != null) {
+        const list = map.get(batch.container_id) ?? [];
+        list.push(batch);
+        map.set(batch.container_id, list);
+      }
     }
+
+    // 2. Партии, распределённые по горшкам (container_id = null)
+    for (const batch of batches) {
+      if (batch.container_id != null) continue;
+
+      const containerIds = new Set(
+        plants
+          .filter((p) => p.batch_id === batch.id && p.container_id != null)
+          .map((p) => p.container_id!)
+      );
+
+      for (const cid of containerIds) {
+        const list = map.get(cid) ?? [];
+        if (!list.find((b) => b.id === batch.id)) list.push(batch);
+        map.set(cid, list);
+      }
+    }
+
     return map;
-  }, [batches]);
+  }, [batches, plants]);
 
   const handleStageClick = (e: KonvaEventObject<MouseEvent>) => {
     if (e.target === e.target.getStage()) {
@@ -172,6 +197,7 @@ export function GardenCanvas({
             plants={plantsByContainer.get(container.id) ?? []}
             batches={batchesByContainer.get(container.id) ?? []}
             isSelected={selectedId === container.id}
+            isHighlighted={highlightedContainerIds?.has(container.id) ?? false}
             onSelect={() => onSelect(container.id)}
             onPlantClick={onPlantClick}
             onBatchClick={onBatchClick}

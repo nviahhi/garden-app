@@ -13,6 +13,8 @@ interface BatchState {
   createBatch: (payload: CreateBatchPayload) => Promise<boolean>;
   removeBatch: (id: number) => Promise<void>;
   germinateBatch: (batchId: number, count: number) => Promise<boolean>;
+  markGerminated: (batchId: number) => Promise<boolean>;
+  markPlantGerminated: (plantId: number) => Promise<boolean>;
   transplantPlant: (
     id: number,
     to_container_id: number,
@@ -78,6 +80,33 @@ export const useBatchStore = create<BatchState>((set, get) => ({
       return true;
     } catch (err) {
       console.error('Ошибка отметки всходов:', err);
+      return false;
+    }
+  },
+
+  markGerminated: async (batchId: number) => {
+    try {
+      await batchesApi.markGerminated(batchId);
+      await get().loadPlants();
+      await get().loadBatches();
+      return true;
+    } catch (err) {
+      console.error('Ошибка отметки всходов:', err);
+      return false;
+    }
+  },
+
+  markPlantGerminated: async (plantId: number) => {
+    try {
+      const updated = await plantsApi.markGerminated(plantId);
+      set({
+        plants: get().plants.map((p) =>
+          p.id === plantId ? { ...p, ...updated } : p
+        ),
+      });
+      return true;
+    } catch (err) {
+      console.error('Ошибка отметки растения:', err);
       return false;
     }
   },

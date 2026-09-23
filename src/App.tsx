@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import './App.css';
 import { GardenCanvas } from './components/GardenCanvas';
 import { ContainerList } from './components/ContainerList';
+import { BatchList } from './components/BatchList';
 import { ContainerEditPanel } from './components/ContainerEditPanel';
 import { ContainerCreateModal } from './components/ContainerCreateModal';
 import { BatchCreateModal } from './components/BatchCreateModal';
@@ -11,11 +12,15 @@ import { useContainerStore } from './store/useContainerStore';
 import { useBatchStore } from './store/useBatchStore';
 import { PLANT_STATUS_LABELS, type Plant, type Batch } from './types';
 
+type SidebarTab = 'containers' | 'batches';
+
 function App() {
   const containers = useContainerStore((s) => s.containers);
   const loadBatches = useBatchStore((s) => s.loadBatches);
   const loadPlants = useBatchStore((s) => s.loadPlants);
   const plants = useBatchStore((s) => s.plants);
+
+  const [sidebarTab, setSidebarTab] = useState<SidebarTab>('containers');
 
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [selectedPlant, setSelectedPlant] = useState<Plant | null>(null);
@@ -31,6 +36,28 @@ function App() {
     loadBatches();
     loadPlants();
   }, [loadBatches, loadPlants]);
+
+  // Какие контейнеры подсветить по выбранной партии
+  const highlightedContainerIds = useMemo(() => {
+    if (!selectedBatch) return new Set<number>();
+
+    const ids = new Set<number>();
+
+    // Партия в одном контейнере (россыпь / ячейки)
+    if (selectedBatch.container_id != null) {
+      ids.add(selectedBatch.container_id);
+    } else {
+      // Партия распределена по горшкам — подсвечиваем все горшки,
+      // где есть её растения
+      for (const p of plants) {
+        if (p.batch_id === selectedBatch.id && p.container_id != null) {
+          ids.add(p.container_id);
+        }
+      }
+    }
+
+    return ids;
+  }, [selectedBatch, plants]);
 
   const handlePlantClick = (plant: Plant) => {
     setSelectedPlant(plant);
@@ -51,11 +78,21 @@ function App() {
 
   return (
     <div className="app-layout">
-      <ContainerList
-        selectedId={selectedId}
-        onSelect={handleContainerSelect}
-        onCreate={() => setCreateContainerOpen(true)}
-      />
+      {sidebarTab === 'containers' ? (
+        <ContainerList
+          selectedId={selectedId}
+          onSelect={handleContainerSelect}
+          onCreate={() => setCreateContainerOpen(true)}
+          onSwitchToBatches={() => setSidebarTab('batches')}
+        />
+      ) : (
+        <BatchList
+          selectedId={selectedBatch?.id ?? null}
+          onSelect={handleBatchClick}
+          onCreate={() => setCreateBatchOpen(true)}
+          onSwitchToContainers={() => setSidebarTab('containers')}
+        />
+      )}
 
       <main className="canvas-area">
         <div className="canvas-toolbar">
@@ -71,10 +108,10 @@ function App() {
           onSelect={handleContainerSelect}
           onPlantClick={handlePlantClick}
           onBatchClick={handleBatchClick}
+          highlightedContainerIds={highlightedContainerIds}
         />
       </main>
 
-      {/* Панель редактирования контейнера */}
       {selectedContainer && !selectedBatch && !selectedPlant && (
         <ContainerEditPanel
           container={selectedContainer}
@@ -82,7 +119,6 @@ function App() {
         />
       )}
 
-      {/* Панель информации о партии */}
       {selectedBatch && (
         <BatchInfoPanel
           key={selectedBatch.id}
@@ -93,7 +129,6 @@ function App() {
         />
       )}
 
-      {/* Мини-карточка растения */}
       {selectedPlant && (
         <div style={{
           position: 'fixed',
@@ -122,7 +157,6 @@ function App() {
         </div>
       )}
 
-      {/* Модалки */}
       {isCreateContainerOpen && (
         <ContainerCreateModal onClose={() => setCreateContainerOpen(false)} />
       )}
