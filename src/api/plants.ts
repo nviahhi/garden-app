@@ -30,13 +30,13 @@ export const plantsApi = {
     return data;
   },
 
-  markGerminated: async (id: number): Promise<Plant> => {
-    const { data } = await api.put(`/plants/${id}/status`, { status: 'germinated' });
+  setStatus: async (id: number, status: Plant['status']): Promise<Plant> => {
+    const { data } = await api.put(`/plants/${id}/status`, { status });
     return data;
   },
 
-  setStatus: async (id: number, status: Plant['status']): Promise<Plant> => {
-    const { data } = await api.put(`/plants/${id}/status`, { status });
+  markGerminated: async (id: number): Promise<Plant> => {
+    const { data } = await api.put(`/plants/${id}/status`, { status: 'germinated' });
     return data;
   },
 

@@ -7,10 +7,12 @@ import { ContainerEditPanel } from './components/ContainerEditPanel';
 import { ContainerCreateModal } from './components/ContainerCreateModal';
 import { BatchCreateModal } from './components/BatchCreateModal';
 import { BatchInfoPanel } from './components/BatchInfoPanel';
+import { PlantInfoPanel } from './components/PlantInfoPanel';
 import { GerminateModal } from './components/GerminateModal';
+import { TransplantModal } from './components/TransplantModal';
 import { useContainerStore } from './store/useContainerStore';
 import { useBatchStore } from './store/useBatchStore';
-import { PLANT_STATUS_LABELS, type Plant, type Batch } from './types';
+import type { Plant, Batch } from './types';
 
 type SidebarTab = 'containers' | 'batches';
 
@@ -18,6 +20,7 @@ function App() {
   const containers = useContainerStore((s) => s.containers);
   const loadBatches = useBatchStore((s) => s.loadBatches);
   const loadPlants = useBatchStore((s) => s.loadPlants);
+  const loadPlantWithEvents = useBatchStore((s) => s.loadPlantWithEvents);
   const plants = useBatchStore((s) => s.plants);
 
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>('containers');
@@ -26,6 +29,7 @@ function App() {
   const [selectedPlant, setSelectedPlant] = useState<Plant | null>(null);
   const [selectedBatch, setSelectedBatch] = useState<Batch | null>(null);
   const [germinateBatch, setGerminateBatch] = useState<Batch | null>(null);
+  const [transplantPlant, setTransplantPlant] = useState<Plant | null>(null);
 
   const [isCreateContainerOpen, setCreateContainerOpen] = useState(false);
   const [isCreateBatchOpen, setCreateBatchOpen] = useState(false);
@@ -37,31 +41,32 @@ function App() {
     loadPlants();
   }, [loadBatches, loadPlants]);
 
-  // Какие контейнеры подсветить по выбранной партии
+  // Подгружаем события выбранного растения
+  useEffect(() => {
+    if (selectedPlant) {
+      loadPlantWithEvents(selectedPlant.id);
+    }
+  }, [selectedPlant, loadPlantWithEvents]);
+
   const highlightedContainerIds = useMemo(() => {
     if (!selectedBatch) return new Set<number>();
-
     const ids = new Set<number>();
-
-    // Партия в одном контейнере (россыпь / ячейки)
     if (selectedBatch.container_id != null) {
       ids.add(selectedBatch.container_id);
     } else {
-      // Партия распределена по горшкам — подсвечиваем все горшки,
-      // где есть её растения
       for (const p of plants) {
         if (p.batch_id === selectedBatch.id && p.container_id != null) {
           ids.add(p.container_id);
         }
       }
     }
-
     return ids;
   }, [selectedBatch, plants]);
 
   const handlePlantClick = (plant: Plant) => {
     setSelectedPlant(plant);
     setSelectedBatch(null);
+    setSelectedId(null);
   };
 
   const handleBatchClick = (batch: Batch) => {
@@ -119,7 +124,7 @@ function App() {
         />
       )}
 
-      {selectedBatch && (
+      {selectedBatch && !selectedPlant && (
         <BatchInfoPanel
           key={selectedBatch.id}
           batch={selectedBatch}
@@ -130,31 +135,12 @@ function App() {
       )}
 
       {selectedPlant && (
-        <div style={{
-          position: 'fixed',
-          bottom: 16,
-          right: 16,
-          background: 'white',
-          padding: 16,
-          borderRadius: 8,
-          boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
-          minWidth: 220,
-        }}>
-          <strong>Растение #{selectedPlant.number}</strong>
-          <div style={{ fontSize: 13, marginTop: 4 }}>
-            {selectedPlant.species} {selectedPlant.variety}
-          </div>
-          <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>
-            Статус: {PLANT_STATUS_LABELS[selectedPlant.status] ?? selectedPlant.status}
-          </div>
-          <button
-            className="btn btn-ghost"
-            style={{ marginTop: 8 }}
-            onClick={() => setSelectedPlant(null)}
-          >
-            Закрыть
-          </button>
-        </div>
+        <PlantInfoPanel
+          key={selectedPlant.id}
+          plant={selectedPlant}
+          onClose={() => setSelectedPlant(null)}
+          onTransplant={(p) => setTransplantPlant(p)}
+        />
       )}
 
       {isCreateContainerOpen && (
@@ -172,6 +158,13 @@ function App() {
             plants.filter((p) => p.batch_id === germinateBatch.id).length
           }
           onClose={() => setGerminateBatch(null)}
+        />
+      )}
+
+      {transplantPlant && (
+        <TransplantModal
+          plant={transplantPlant}
+          onClose={() => setTransplantPlant(null)}
         />
       )}
     </div>

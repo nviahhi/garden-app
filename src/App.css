@@ -550,3 +550,162 @@ button {
   margin-right: 6px;
   font-size: 14px;
 }
+
+/* Действия в панели растения */
+.plant-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.note-textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #d0d0c0;
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: inherit;
+  background: #fafaf5;
+  color: #2e4a2e;
+  resize: vertical;
+  min-height: 50px;
+}
+
+.note-textarea:focus {
+  outline: none;
+  border-color: #4a7c4a;
+  background: white;
+}
+
+/* История растения */
+.plant-history h4 {
+  font-size: 13px;
+  color: #6b8e6b;
+  margin-bottom: 6px;
+}
+
+.plant-history-list {
+  max-height: 240px;
+  overflow-y: auto;
+  border: 1px solid #e0e0d0;
+  border-radius: 6px;
+  background: #fafaf5;
+}
+
+.plant-event {
+  padding: 8px 10px;
+  border-bottom: 1px solid #f0f0e8;
+}
+
+.plant-event:last-child {
+  border-bottom: none;
+}
+
+.plant-event-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  margin-bottom: 2px;
+}
+
+.plant-event-type {
+  font-weight: 600;
+  color: #2e4a2e;
+}
+
+.plant-event-date {
+  color: #6b8e6b;
+}
+
+.plant-event-detail {
+  font-size: 12px;
+  color: #4a7c4a;
+  margin-top: 2px;
+}
+
+.plant-event-notes {
+  font-size: 12px;
+  color: #2e4a2e;
+  margin-top: 4px;
+  font-style: italic;
+}
+
+/* Заметки в панели партии (использовалось ранее) */
+.batch-card-notes {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #6b8e6b;
+  font-style: italic;
+  padding-top: 6px;
+  border-top: 1px solid #e0e0d0;
+}
+
+/* Переключатель статуса растения */
+.status-switcher {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.status-switcher-label {
+  font-size: 12px;
+  color: #6b8e6b;
+  font-weight: 500;
+}
+
+.status-switcher-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.status-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 6px;
+  background: #fafaf5;
+  border: 1px solid #e0e0d0;
+  border-radius: 6px;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    transform 0.1s;
+  font-family: inherit;
+}
+
+.status-btn:hover:not(:disabled) {
+  background: #f0f0e8;
+  border-color: #4a7c4a;
+}
+
+.status-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.status-btn.is-active {
+  background: #e8f5e9;
+  border-color: #4a7c4a;
+  cursor: default;
+}
+
+.status-btn:disabled {
+  opacity: 0.7;
+}
+
+.status-btn-emoji {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.status-btn-label {
+  font-size: 11px;
+  color: #2e4a2e;
+  font-weight: 500;
+}
+
+.status-btn.is-active .status-btn-label {
+  color: #2e7d32;
+}

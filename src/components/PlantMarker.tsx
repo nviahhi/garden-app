@@ -1,15 +1,6 @@
 import { Circle, Text, Group } from 'react-konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
-import type { Plant } from '../types';
-
-const STATUS_COLORS: Record<Plant['status'], string> = {
-  sown: '#d7ccc8',           // светло-коричневый — посеяно
-  germinated: '#a5d6a7',     // светло-зелёный — взошло
-  growing: '#4caf50',        // зелёный — растёт
-  transplanted: '#ffb74d',   // оранжевый
-  harvested: '#64b5f6',      // синий
-  dead: '#e57373',           // красный
-};
+import { PLANT_STATUS_COLORS, type Plant } from '../types';
 
 interface PlantMarkerProps {
   plant: Plant;
@@ -19,17 +10,19 @@ interface PlantMarkerProps {
   onClick?: () => void;
 }
 
-export function PlantMarker({ plant, x, y, radius = 8, onClick }: PlantMarkerProps) {
+export function PlantMarker({ plant, x, y, radius = 10, onClick }: PlantMarkerProps) {
   const handleClick = (e: KonvaEventObject<Event>) => {
     e.cancelBubble = true;
     onClick?.();
   };
 
+  const color = PLANT_STATUS_COLORS[plant.status] ?? '#a5d6a7';
+
   return (
     <Group x={x} y={y} onClick={handleClick} onTap={handleClick}>
       <Circle
         radius={radius}
-        fill={STATUS_COLORS[plant.status]}
+        fill={color}
         stroke="#2e4a2e"
         strokeWidth={1}
         shadowBlur={3}

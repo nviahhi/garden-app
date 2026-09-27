@@ -30,9 +30,7 @@ export function BatchInfoPanel({
 
   const plantsCount = batchPlants.length;
   const sownCount = batchPlants.filter((p) => p.status === 'sown').length;
-  const germinatedCount = batchPlants.filter(
-    (p) => p.status !== 'sown' && p.status !== 'dead'
-  ).length;  
+  const germinatedCount = batchPlants.filter((p) => p.status !== 'sown').length;
 
   // Кнопка 1: создать растения (если их нет и есть seeds_count)
   const canCreatePlants = plantsCount === 0 && batch.seeds_count > 0 && batch.container_id != null;

@@ -160,12 +160,11 @@ router.put('/:id/transplant', async (req, res) => {
       notes || null,
     ]);
 
-    // Обновляем растение
+    // Обновляем растение — статус НЕ меняем, только местоположение
     const updatedResult = await client.query(`
       UPDATE plants
       SET container_id = $1,
           cell_index = $2,
-          status = 'transplanted',
           updated_at = NOW()
       WHERE id = $3
       RETURNING *
@@ -190,7 +189,7 @@ router.put('/:id/status', async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
 
-    const allowed = ['sown', 'germinated', 'growing', 'transplanted', 'harvested', 'dead'];
+    const allowed = ['sown', 'growing', 'flowering', 'fruiting', 'done'];
     if (!allowed.includes(status)) {
       return res.status(400).json({ error: `status должен быть одним из: ${allowed.join(', ')}` });
     }

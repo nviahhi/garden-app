@@ -28,13 +28,20 @@ export interface Batch {
   container_type?: string | null;
 }
 
+export type PlantStatus =
+  | 'sown'
+  | 'growing'
+  | 'flowering'
+  | 'fruiting'
+  | 'done';
+
 export interface Plant {
   id: number;
   batch_id: number;
   container_id: number | null;
   cell_index: number | null;
   number: number;
-  status: 'sown' | 'germinated' | 'growing' | 'transplanted' | 'harvested' | 'dead';
+  status: PlantStatus;
   notes: string | null;
   created_at: string;
   updated_at: string;
@@ -43,6 +50,7 @@ export interface Plant {
   sowing_date?: string;
   container_name?: string | null;
   container_type?: string | null;
+  events?: PlantEvent[];
 }
 
 export interface PlantEvent {
@@ -59,11 +67,26 @@ export interface PlantEvent {
   to_container_name?: string | null;
 }
 
-export const PLANT_STATUS_LABELS: Record<Plant['status'], string> = {
+export const PLANT_STATUS_LABELS: Record<PlantStatus, string> = {
   sown: 'Посеяно',
-  germinated: 'Взошло',
   growing: 'Растёт',
-  transplanted: 'Пикировано',
-  harvested: 'Собрано',
-  dead: 'Погибло',
+  flowering: 'Цветёт',
+  fruiting: 'Плодоносит',
+  done: 'Завершено',
+};
+
+export const PLANT_STATUS_EMOJI: Record<PlantStatus, string> = {
+  sown: '🌰',
+  growing: '🌱',
+  flowering: '🌸',
+  fruiting: '🍅',
+  done: '✅',
+};
+
+export const PLANT_STATUS_COLORS: Record<PlantStatus, string> = {
+  sown: '#d7ccc8',
+  growing: '#a5d6a7',
+  flowering: '#f8bbd0',
+  fruiting: '#ffcc80',
+  done: '#90a4ae',
 };

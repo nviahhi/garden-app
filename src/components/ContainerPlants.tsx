@@ -33,7 +33,7 @@ export function ContainerPlants({
 
   if (!hasPlants && !hasBatches) return null;
 
-  // === Режим 1: сетка + растения с cell_index ===
+  // ===== Режим 1: сетка + растения с cell_index =====
   if (hasGrid && hasPlants) {
     const cols = container.cols!;
     const rows = container.rows!;
@@ -74,12 +74,53 @@ export function ContainerPlants({
     }
   }
 
-  // === Режим 2: бейджи по партиям ===
-  // Для каждой партии, у которой есть растения в ЭТОМ контейнере
-  const items = batches.map((batch) => {
+  // ===== Режим 1.5: без сетки, 1–4 растения — маркеры в ряд + бейджи =====
+  const nonGridPlants = plants.filter((p) => p.cell_index === null);
+
+  if (!hasGrid && nonGridPlants.length > 0 && nonGridPlants.length <= 4) {
+    const count = nonGridPlants.length;
+    const startX = container.width / 2 - ((count - 1) * 24) / 2;
+    const cy = container.height / 2 + 6;
+
+    const badgeItems = buildBadgeItems(plants, batches, onBatchClick);
+
+    return (
+      <Group>
+        {/* Маркеры растений */}
+        {nonGridPlants.map((plant, i) => (
+          <PlantMarker
+            key={plant.id}
+            plant={plant}
+            x={startX + i * 24}
+            y={cy}
+            radius={10}
+            onClick={() => onPlantClick?.(plant)}
+          />
+        ))}
+
+        {/* Бейджи партий */}
+        {renderBadges(container, badgeItems)}
+      </Group>
+    );
+  }
+
+  // ===== Режим 2: бейджи по партиям =====
+  const items = buildBadgeItems(plants, batches, onBatchClick);
+
+  if (items.length === 0) return null;
+
+  return renderBadges(container, items);
+}
+
+// Общая логика формирования бейджей
+function buildBadgeItems(
+  plants: Plant[],
+  batches: Batch[],
+  onBatchClick?: (batch: Batch) => void
+) {
+  return batches.map((batch) => {
     const localPlants = plants.filter((p) => p.batch_id === batch.id);
 
-    // Нет растений в этом контейнере — показываем как «посеяно»
     if (localPlants.length === 0) {
       return {
         batch,
@@ -93,9 +134,7 @@ export function ContainerPlants({
     const isDistributed = batch.container_id === null;
     const total = isDistributed ? localPlants.length : batch.seeds_count;
 
-    const germinated = localPlants.filter((p) =>
-      p.status !== 'sown' && p.status !== 'dead'
-    ).length;
+    const germinated = localPlants.filter((p) => p.status !== 'sown').length;
 
     const label = germinated > 0
       ? `🌱 ${germinated}/${total}`
@@ -108,16 +147,16 @@ export function ContainerPlants({
       onClick: () => onBatchClick?.(batch),
     };
   });
-
-  if (items.length === 0) return null;
-
-  return renderBadges(container, items);
 }
 
-function renderBadges(
-  container: Container,
-  items: { batch: Batch; label: string; color: string; onClick: () => void }[]
-) {
+interface BadgeItem {
+  batch: Batch;
+  label: string;
+  color: string;
+  onClick: () => void;
+}
+
+function renderBadges(container: Container, items: BadgeItem[]) {
   return (
     <Group>
       {items.map((item, index) => {

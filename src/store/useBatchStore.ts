@@ -20,7 +20,15 @@ interface BatchState {
     to_container_id: number,
     to_cell_index?: number,
     notes?: string
-  ) => Promise<void>;
+  ) => Promise<boolean>;
+  setPlantStatus: (id: number, status: Plant['status']) => Promise<boolean>;
+  removePlant: (id: number) => Promise<boolean>;
+  addPlantEvent: (
+    plantId: number,
+    eventType: string,
+    notes: string
+  ) => Promise<boolean>;
+  loadPlantWithEvents: (id: number) => Promise<Plant | null>;
 }
 
 export const useBatchStore = create<BatchState>((set, get) => ({
@@ -84,7 +92,7 @@ export const useBatchStore = create<BatchState>((set, get) => ({
     }
   },
 
-  markGerminated: async (batchId: number) => {
+  markGerminated: async (batchId) => {
     try {
       await batchesApi.markGerminated(batchId);
       await get().loadPlants();
@@ -96,7 +104,7 @@ export const useBatchStore = create<BatchState>((set, get) => ({
     }
   },
 
-  markPlantGerminated: async (plantId: number) => {
+  markPlantGerminated: async (plantId) => {
     try {
       const updated = await plantsApi.markGerminated(plantId);
       set({
@@ -118,13 +126,73 @@ export const useBatchStore = create<BatchState>((set, get) => ({
         to_cell_index,
         notes,
       });
+      // Обновляем растение локально
       set({
         plants: get().plants.map((p) =>
           p.id === id ? { ...p, ...updated } : p
         ),
       });
+      // Перезагружаем, чтобы подтянуть container_name и события
+      await get().loadPlants();
+      return true;
     } catch (err) {
       console.error('Ошибка пересадки:', err);
+      return false;
+    }
+  },
+
+  setPlantStatus: async (id, status) => {
+    try {
+      const updated = await plantsApi.setStatus(id, status);
+      set({
+        plants: get().plants.map((p) =>
+          p.id === id ? { ...p, ...updated } : p
+        ),
+      });
+      return true;
+    } catch (err) {
+      console.error('Ошибка смены статуса:', err);
+      return false;
+    }
+  },
+
+  removePlant: async (id) => {
+    try {
+      await plantsApi.remove(id);
+      set({
+        plants: get().plants.filter((p) => p.id !== id),
+      });
+      return true;
+    } catch (err) {
+      console.error('Ошибка удаления растения:', err);
+      return false;
+    }
+  },
+
+  addPlantEvent: async (plantId, eventType, notes) => {
+    try {
+      await plantsApi.addEvent(plantId, { event_type: eventType, notes });
+      // Перезагружаем растение с историей
+      await get().loadPlantWithEvents(plantId);
+      return true;
+    } catch (err) {
+      console.error('Ошибка добавления события:', err);
+      return false;
+    }
+  },
+
+  loadPlantWithEvents: async (id) => {
+    try {
+      const data = await plantsApi.getOne(id);
+      set({
+        plants: get().plants.map((p) =>
+          p.id === id ? { ...p, events: data.events } : p
+        ),
+      });
+      return data;
+    } catch (err) {
+      console.error('Ошибка загрузки растения с событиями:', err);
+      return null;
     }
   },
 }));
