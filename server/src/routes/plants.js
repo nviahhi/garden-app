@@ -97,15 +97,15 @@ router.post('/', async (req, res) => {
     }
 
     const result = await pool.query(`
-      INSERT INTO plants (batch_id, container_id, cell_index, number, status, notes)
-      VALUES ($1, $2, $3, $4, $5, $6)
+      INSERT INTO plants (batch_id, container_id, cell_index, number, status, notes, display_number)
+      VALUES ($1, $2, $3, $4, $5, $6, nextval('plants_display_number_seq'))
       RETURNING *
     `, [
       batch_id,
       container_id || null,
       cell_index ?? null,
       number,
-      status || 'seedling',
+      status || 'sown',
       notes || null,
     ]);
 

@@ -56,7 +56,7 @@ export function ContainerPlants({
 
             const cx = CELL_PADDING + col * cellWidth + cellWidth / 2;
             const cy = HEADER_HEIGHT + row * cellHeight + cellHeight / 2;
-            const radius = Math.max(6, Math.min(cellWidth, cellHeight) / 2 - 2);
+            const radius = Math.max(3, Math.min(cellWidth, cellHeight) / 2 - 9);
 
             return (
               <PlantMarker
@@ -79,7 +79,9 @@ export function ContainerPlants({
 
   if (!hasGrid && nonGridPlants.length > 0 && nonGridPlants.length <= 4) {
     const count = nonGridPlants.length;
-    const startX = container.width / 2 - ((count - 1) * 24) / 2;
+    const RADIUS = 14;
+    const GAP = RADIUS * 2 + 4;
+    const startX = container.width / 2 - ((count - 1) * GAP) / 2;
     const cy = container.height / 2 + 6;
 
     const badgeItems = buildBadgeItems(plants, batches, onBatchClick);
@@ -91,9 +93,9 @@ export function ContainerPlants({
           <PlantMarker
             key={plant.id}
             plant={plant}
-            x={startX + i * 24}
+            x={startX + i * GAP}
             y={cy}
-            radius={10}
+            radius={RADIUS}
             onClick={() => onPlantClick?.(plant)}
           />
         ))}

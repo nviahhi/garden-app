@@ -131,6 +131,7 @@ function App() {
           onClose={() => setSelectedBatch(null)}
           onGerminate={(b) => setGerminateBatch(b)}
           onSelectBatch={(b) => setSelectedBatch(b)}
+          onTransplant={(p) => setTransplantPlant(p)}
         />
       )}
 

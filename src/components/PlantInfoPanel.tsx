@@ -63,7 +63,8 @@ export function PlantInfoPanel({ plant, onClose, onTransplant }: PlantInfoPanelP
   };
 
   const handleDelete = async () => {
-    if (confirm(`Удалить растение #${currentPlant.number}?`)) {
+    const num = currentPlant.display_number ?? currentPlant.number;
+    if (confirm(`Удалить растение #${num}?`)) {
       await removePlant(currentPlant.id);
       onClose();
     }
@@ -72,7 +73,7 @@ export function PlantInfoPanel({ plant, onClose, onTransplant }: PlantInfoPanelP
   return (
     <aside className="edit-panel">
       <div className="panel-header">
-        <h3>Растение #{currentPlant.number}</h3>
+        <h3>Растение #{currentPlant.display_number ?? currentPlant.number}</h3>
         <button className="btn-icon" onClick={onClose} aria-label="Закрыть">×</button>
       </div>
 
@@ -81,6 +82,12 @@ export function PlantInfoPanel({ plant, onClose, onTransplant }: PlantInfoPanelP
           {currentPlant.species}
           {currentPlant.variety ? ` · ${currentPlant.variety}` : ''}
         </div>
+        {batch && (
+          <div className="batch-card-row">
+            <span className="batch-label">Партия:</span>
+            <span>#{batch.id}</span>
+          </div>
+        )}
         <div className="batch-card-row">
           <span className="batch-label">Статус:</span>
           <span>

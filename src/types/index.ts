@@ -41,6 +41,7 @@ export interface Plant {
   container_id: number | null;
   cell_index: number | null;
   number: number;
+  display_number: number | null;   // ← новое
   status: PlantStatus;
   notes: string | null;
   created_at: string;

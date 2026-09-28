@@ -709,3 +709,78 @@ button {
 .status-btn.is-active .status-btn-label {
   color: #2e7d32;
 }
+
+.batch-card-row .batch-label + span {
+  font-weight: 500;
+}
+
+/* Строка растения в списке партии */
+.batch-plant-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  font-size: 13px;
+  border-bottom: 1px solid #f0f0e8;
+}
+
+.batch-plant-item:last-child {
+  border-bottom: none;
+}
+
+.batch-plant-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.batch-plant-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+/* Маленькая текстовая кнопка */
+.btn-sm {
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  background: transparent;
+  border: 1px solid #d0d0c0;
+  border-radius: 4px;
+  color: #4a7c4a;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+  font-family: inherit;
+  white-space: nowrap;
+}
+
+.btn-sm:hover {
+  background: #e8f5e9;
+  border-color: #4a7c4a;
+}
+
+/* Маленькая иконочная кнопка (переиспользуется) */
+.btn-icon-sm {
+  background: transparent;
+  border: 1px solid #d0d0c0;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 12px;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+  line-height: 1;
+}
+
+.btn-icon-sm:hover {
+  background: #e8f5e9;
+  border-color: #4a7c4a;
+}

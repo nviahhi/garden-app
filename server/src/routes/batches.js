@@ -121,23 +121,24 @@ router.post('/', async (req, res) => {
           const num = i + 1;
           const safeCell = Number(cellIndex);
           const safeContainer = Number(container_id);
-          return `(${batch.id}, ${safeContainer}, ${safeCell}, ${num}, 'sown')`;
+          return `(${batch.id}, ${safeContainer}, ${safeCell}, ${num}, 'sown', nextval('plants_display_number_seq'))`;
         })
         .join(',');
 
       const plantsResult = await client.query(`
-        INSERT INTO plants (batch_id, container_id, cell_index, number, status)
+        INSERT INTO plants (batch_id, container_id, cell_index, number, status, display_number)
         VALUES ${values}
         RETURNING *
       `);
       createdPlants = plantsResult.rows;
     }
 
-    // === Режим 2: по отдельным горшкам (по 1 растению в горшок) ===
+    // === Режим 2: по отдельным горшкам ===
     if (Array.isArray(container_ids) && container_ids.length > 0) {
       const plantsResult = await client.query(`
-        INSERT INTO plants (batch_id, container_id, cell_index, number, status)
-        SELECT $1, cid, NULL, ROW_NUMBER() OVER (ORDER BY cid), 'sown'
+        INSERT INTO plants (batch_id, container_id, cell_index, number, status, display_number)
+        SELECT $1, cid, NULL, ROW_NUMBER() OVER (ORDER BY cid), 'sown',
+              nextval('plants_display_number_seq')
         FROM unnest($2::int[]) AS cid
         RETURNING *
       `, [batch.id, container_ids]);
@@ -205,8 +206,8 @@ router.post('/:id/germinate', async (req, res) => {
     for (let i = 0; i < count; i++) {
       const number = existingCount + i + 1;
       const result = await client.query(
-        `INSERT INTO plants (batch_id, container_id, cell_index, number, status)
-         VALUES ($1, $2, NULL, $3, 'germinated')
+        `INSERT INTO plants (batch_id, container_id, cell_index, number, status, display_number)
+         VALUES ($1, $2, NULL, $3, 'growing', nextval('plants_display_number_seq'))
          RETURNING *`,
         [id, batch.container_id, number]
       );
@@ -237,7 +238,7 @@ router.put('/:id/mark-germinated', async (req, res) => {
 
     const result = await pool.query(`
       UPDATE plants
-      SET status = 'germinated', updated_at = NOW()
+      SET status = 'growing', updated_at = NOW()
       WHERE batch_id = $1 AND status = 'sown'
       RETURNING *
     `, [id]);

@@ -36,7 +36,7 @@ export const plantsApi = {
   },
 
   markGerminated: async (id: number): Promise<Plant> => {
-    const { data } = await api.put(`/plants/${id}/status`, { status: 'germinated' });
+    const { data } = await api.put(`/plants/${id}/status`, { status: 'growing' });
     return data;
   },
 

@@ -1,11 +1,12 @@
 import { useBatchStore } from '../store/useBatchStore';
-import { PLANT_STATUS_LABELS, type Batch } from '../types';
+import { PLANT_STATUS_LABELS, type Batch, type Plant } from '../types';
 
 interface BatchInfoPanelProps {
   batch: Batch;
   onClose: () => void;
   onGerminate: (batch: Batch) => void;
   onSelectBatch: (batch: Batch) => void;
+  onTransplant: (plant: Plant) => void;
 }
 
 export function BatchInfoPanel({
@@ -13,6 +14,7 @@ export function BatchInfoPanel({
   onClose,
   onGerminate,
   onSelectBatch,
+  onTransplant,
 }: BatchInfoPanelProps) {
   const removeBatch = useBatchStore((s) => s.removeBatch);
   const markGerminated = useBatchStore((s) => s.markGerminated);
@@ -26,16 +28,13 @@ export function BatchInfoPanel({
 
   const batchPlants = allPlants
     .filter((p) => p.batch_id === batch.id)
-    .sort((a, b) => a.number - b.number);
+    .sort((a, b) => (a.display_number ?? a.number) - (b.display_number ?? b.number));
 
   const plantsCount = batchPlants.length;
   const sownCount = batchPlants.filter((p) => p.status === 'sown').length;
   const germinatedCount = batchPlants.filter((p) => p.status !== 'sown').length;
-
-  // Кнопка 1: создать растения (если их нет и есть seeds_count)
+  
   const canCreatePlants = plantsCount === 0 && batch.seeds_count > 0 && batch.container_id != null;
-
-  // Кнопка 2: перевести sown → germinated
   const canMarkGerminated = sownCount > 0;
 
   const handleDelete = async () => {
@@ -127,16 +126,18 @@ export function BatchInfoPanel({
           <div className="batch-plants-list">
             {batchPlants.map((p) => (
               <div key={p.id} className="batch-plant-item">
-                <span className="batch-plant-num">
-                  #{p.number}
-                  {p.container_name && (
-                    <span className="batch-plant-container"> · {p.container_name}</span>
-                  )}
-                </span>
-                <span className="batch-plant-right">
+                <div className="batch-plant-info">
+                  <span className="batch-plant-num">
+                    #{p.display_number ?? p.number}
+                    {p.container_name && (
+                      <span className="batch-plant-container"> · {p.container_name}</span>
+                    )}
+                  </span>
                   <span className="batch-plant-status">
                     {PLANT_STATUS_LABELS[p.status] ?? p.status}
                   </span>
+                </div>
+                <div className="batch-plant-actions">
                   {p.status === 'sown' && (
                     <button
                       className="btn-icon-sm"
@@ -146,7 +147,15 @@ export function BatchInfoPanel({
                       🌱
                     </button>
                   )}
-                </span>
+                  {p.status !== 'done' && (
+                    <button
+                      className="btn-sm"
+                      onClick={() => onTransplant(p)}
+                    >
+                      Пересадить
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
