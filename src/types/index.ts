@@ -1,6 +1,7 @@
 export interface Container {
   id: number;
   user_id: number;
+  zone_id: number | null;
   name: string;
   type: 'tray' | 'pot' | 'bed' | 'greenhouse';
   x: number;
@@ -90,4 +91,67 @@ export const PLANT_STATUS_COLORS: Record<PlantStatus, string> = {
   flowering: '#f8bbd0',
   fruiting: '#ffcc80',
   done: '#90a4ae',
+};
+
+export type ZoneType =
+  | 'windowsill'
+  | 'shelf'
+  | 'balcony'
+  | 'greenhouse'
+  | 'garden';
+
+export interface ZoneShelf {
+  id: number;
+  zone_id: number;
+  name: string;
+  y: number;
+  height: number;
+  color: string;
+  sort_order: number;
+}
+
+export interface Zone {
+  id: number;
+  user_id: number;
+  name: string;
+  type: ZoneType;
+  canvas_width: number;
+  canvas_height: number;
+  px_per_cm: number;
+  background_color: string;
+  grid_size: number;
+  sort_order: number;
+  created_at: string;
+  containers_count?: number;
+  shelves?: ZoneShelf[];
+}
+
+export const ZONE_TYPE_LABELS: Record<ZoneType, string> = {
+  windowsill: 'Подоконник',
+  shelf: 'Стеллаж',
+  balcony: 'Балкон',
+  greenhouse: 'Теплица',
+  garden: 'Огород',
+};
+
+export const ZONE_TYPE_EMOJI: Record<ZoneType, string> = {
+  windowsill: '🪟',
+  shelf: '🗄️',
+  balcony: '🌇',
+  greenhouse: '🏡',
+  garden: '🌾',
+};
+
+// Дефолты для создания зоны
+export const ZONE_DEFAULTS: Record<ZoneType, {
+  width: number;
+  height: number;
+  pxPerCm: number;
+  bg: string;
+}> = {
+  windowsill: { width: 1200, height: 400, pxPerCm: 20, bg: '#faf6ef' },
+  shelf:      { width: 1000, height: 900, pxPerCm: 20, bg: '#f5f0e6' },
+  balcony:    { width: 1600, height: 800, pxPerCm: 10, bg: '#f0f5f0' },
+  greenhouse: { width: 1600, height: 1000, pxPerCm: 10, bg: '#eef5ee' },
+  garden:     { width: 2400, height: 1600, pxPerCm: 2, bg: '#e8f0e0' },
 };

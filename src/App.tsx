@@ -10,18 +10,27 @@ import { BatchInfoPanel } from './components/BatchInfoPanel';
 import { PlantInfoPanel } from './components/PlantInfoPanel';
 import { GerminateModal } from './components/GerminateModal';
 import { TransplantModal } from './components/TransplantModal';
+import { ZoneSwitcher } from './components/ZoneSwitcher';
+import { ZoneModal } from './components/ZoneModal';
 import { useContainerStore } from './store/useContainerStore';
 import { useBatchStore } from './store/useBatchStore';
+import { useZoneStore } from './store/useZoneStore';
 import type { Plant, Batch } from './types';
 
 type SidebarTab = 'containers' | 'batches';
+type ZoneModalState = { mode: 'create' } | { mode: 'edit'; zoneId: number } | null;
 
 function App() {
   const containers = useContainerStore((s) => s.containers);
+  const loadContainers = useContainerStore((s) => s.loadContainers);
+
   const loadBatches = useBatchStore((s) => s.loadBatches);
   const loadPlants = useBatchStore((s) => s.loadPlants);
   const loadPlantWithEvents = useBatchStore((s) => s.loadPlantWithEvents);
   const plants = useBatchStore((s) => s.plants);
+
+  const currentZone = useZoneStore((s) => s.currentZone);
+  const loadZones = useZoneStore((s) => s.loadZones);
 
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>('containers');
 
@@ -33,13 +42,19 @@ function App() {
 
   const [isCreateContainerOpen, setCreateContainerOpen] = useState(false);
   const [isCreateBatchOpen, setCreateBatchOpen] = useState(false);
+  const [zoneModal, setZoneModal] = useState<ZoneModalState>(null);
 
-  const selectedContainer = containers.find((c) => c.id === selectedId) ?? null;
-
+  // Загружаем зоны при монтировании
   useEffect(() => {
+    loadZones();
+  }, [loadZones]);
+
+  // Загружаем данные после выбора зоны
+  useEffect(() => {
+    loadContainers();
     loadBatches();
     loadPlants();
-  }, [loadBatches, loadPlants]);
+  }, [loadContainers, loadBatches, loadPlants]);
 
   // Подгружаем события выбранного растения
   useEffect(() => {
@@ -48,6 +63,15 @@ function App() {
     }
   }, [selectedPlant, loadPlantWithEvents]);
 
+  // Контейнеры текущей зоны
+  const zoneContainers = useMemo(
+    () => containers.filter((c) => c.zone_id === currentZone?.id),
+    [containers, currentZone]
+  );
+
+  const selectedContainer = zoneContainers.find((c) => c.id === selectedId) ?? null;
+
+  // Подсветка контейнеров по выбранной партии
   const highlightedContainerIds = useMemo(() => {
     if (!selectedBatch) return new Set<number>();
     const ids = new Set<number>();
@@ -81,11 +105,19 @@ function App() {
     setSelectedPlant(null);
   };
 
+  const handleZoneSwitch = () => {
+    // Сбрасываем всё выбранное при переключении зоны
+    setSelectedId(null);
+    setSelectedBatch(null);
+    setSelectedPlant(null);
+  };
+
   return (
     <div className="app-layout">
       {sidebarTab === 'containers' ? (
         <ContainerList
           selectedId={selectedId}
+          zoneId={currentZone?.id ?? null}
           onSelect={handleContainerSelect}
           onCreate={() => setCreateContainerOpen(true)}
           onSwitchToBatches={() => setSidebarTab('batches')}
@@ -100,6 +132,12 @@ function App() {
       )}
 
       <main className="canvas-area">
+        <ZoneSwitcher
+          onSwitch={handleZoneSwitch}
+          onCreate={() => setZoneModal({ mode: 'create' })}
+          onEdit={() => currentZone && setZoneModal({ mode: 'edit', zoneId: currentZone.id })}
+        />
+
         <div className="canvas-toolbar">
           <button
             className="btn btn-primary"
@@ -144,8 +182,11 @@ function App() {
         />
       )}
 
-      {isCreateContainerOpen && (
-        <ContainerCreateModal onClose={() => setCreateContainerOpen(false)} />
+      {isCreateContainerOpen && currentZone && (
+        <ContainerCreateModal
+          zoneId={currentZone.id}
+          onClose={() => setCreateContainerOpen(false)}
+        />
       )}
 
       {isCreateBatchOpen && (
@@ -166,6 +207,14 @@ function App() {
         <TransplantModal
           plant={transplantPlant}
           onClose={() => setTransplantPlant(null)}
+        />
+      )}
+
+      {zoneModal && (
+        <ZoneModal
+          mode={zoneModal.mode}
+          zoneId={zoneModal.mode === 'edit' ? zoneModal.zoneId : undefined}
+          onClose={() => setZoneModal(null)}
         />
       )}
     </div>

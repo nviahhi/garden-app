@@ -784,3 +784,213 @@ button {
   background: #e8f5e9;
   border-color: #4a7c4a;
 }
+
+/* Переключатель зон */
+.zone-switcher {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 6px 8px;
+  background: #f5f0e6;
+  border-radius: 8px;
+  border: 1px solid #e0d8c8;
+}
+
+.zone-tabs {
+  display: flex;
+  gap: 4px;
+  flex: 1;
+  overflow-x: auto;
+}
+
+.zone-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: #6b5b45;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+  font-family: inherit;
+}
+
+.zone-tab:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.zone-tab.is-active {
+  background: white;
+  border-color: #4a7c4a;
+  color: #2e4a2e;
+}
+
+.zone-tab-emoji {
+  font-size: 14px;
+}
+
+.zone-tab-add {
+  padding: 6px 10px;
+  font-weight: bold;
+  color: #4a7c4a;
+  font-size: 16px;
+}
+
+.zone-tab-add:hover {
+  background: #e8f5e9;
+}
+
+/* Переключатель зон */
+.zone-switcher {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 6px 8px;
+  background: #f5f0e6;
+  border-radius: 8px;
+  border: 1px solid #e0d8c8;
+}
+
+.zone-tabs {
+  display: flex;
+  gap: 4px;
+  flex: 1;
+  overflow-x: auto;
+}
+
+.zone-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: #6b5b45;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+  font-family: inherit;
+}
+
+.zone-tab:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.zone-tab.is-active {
+  background: white;
+  border-color: #4a7c4a;
+  color: #2e4a2e;
+}
+
+.zone-tab-emoji {
+  font-size: 14px;
+}
+
+.zone-tab-add {
+  padding: 6px 10px;
+  font-weight: bold;
+  color: #4a7c4a;
+  font-size: 16px;
+}
+
+.zone-tab-add:hover {
+  background: #e8f5e9;
+}
+
+/* Сетка типов зон в модалке */
+.zone-type-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.zone-type-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 6px;
+  background: #fafaf5;
+  border: 1px solid #e0e0d0;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: inherit;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+
+.zone-type-btn:hover {
+  background: #f0f0e8;
+  border-color: #4a7c4a;
+}
+
+.zone-type-btn.is-active {
+  background: #e8f5e9;
+  border-color: #4a7c4a;
+}
+
+.zone-type-emoji {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.zone-type-label {
+  font-size: 11px;
+  color: #2e4a2e;
+  font-weight: 500;
+  text-align: center;
+}
+
+/* Модалка шире обычной */
+.modal-wide {
+  width: 500px;
+  max-width: calc(100vw - 32px);
+}
+
+/* Редактор полок */
+.shelves-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.shelf-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.shelf-name-input {
+  flex: 1;
+  padding: 6px 8px;
+  border: 1px solid #d0d0c0;
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: inherit;
+  background: #fafaf5;
+  color: #2e4a2e;
+  min-width: 0;
+}
+
+.shelf-name-input:focus {
+  outline: none;
+  border-color: #4a7c4a;
+  background: white;
+}

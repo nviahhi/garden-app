@@ -3,13 +3,13 @@ import type { KonvaEventObject } from 'konva/lib/Node';
 import { useEffect, useMemo } from 'react';
 import { useContainerStore } from '../store/useContainerStore';
 import { useBatchStore } from '../store/useBatchStore';
-import type { Container, Plant, Batch } from '../types';
+import { useZoneStore } from '../store/useZoneStore';
+import type { Container, Plant, Batch, Zone } from '../types';
 import { CanvasGrid } from './CanvasGrid';
 import { ContainerCells } from './ContainerCells';
 import { ContainerPlants } from './ContainerPlants';
+import { ZoneBackground } from './ZoneBackground';
 
-const CANVAS_WIDTH = 1200;
-const CANVAS_HEIGHT = 800;
 const GRID_SIZE = 20;
 
 interface GardenCanvasProps {
@@ -31,6 +31,7 @@ function ContainerShape({
   onBatchClick,
 }: {
   container: Container;
+  zone: Zone;
   plants: Plant[];
   batches: Batch[];
   isSelected: boolean;
@@ -124,6 +125,7 @@ export function GardenCanvas({
   highlightedContainerIds,
 }: GardenCanvasProps) {
   const { containers, isLoading, loadContainers } = useContainerStore();
+  const zone = useZoneStore((s) => s.currentZone);
   const plants = useBatchStore((s) => s.plants);
   const batches = useBatchStore((s) => s.batches);
   const loadPlants = useBatchStore((s) => s.loadPlants);
@@ -134,6 +136,12 @@ export function GardenCanvas({
     loadPlants();
     loadBatches();
   }, [loadContainers, loadPlants, loadBatches]);
+
+  // Контейнеры текущей зоны
+  const zoneContainers = useMemo(
+    () => containers.filter((c) => c.zone_id === zone?.id),
+    [containers, zone]
+  );
 
   const plantsByContainer = useMemo(() => {
     const map = new Map<number, Plant[]>();
@@ -149,7 +157,6 @@ export function GardenCanvas({
   const batchesByContainer = useMemo(() => {
     const map = new Map<number, Batch[]>();
 
-    // 1. Партии с явным container_id (россыпь, ячейки)
     for (const batch of batches) {
       if (batch.container_id != null) {
         const list = map.get(batch.container_id) ?? [];
@@ -158,7 +165,6 @@ export function GardenCanvas({
       }
     }
 
-    // 2. Партии, распределённые по горшкам (container_id = null)
     for (const batch of batches) {
       if (batch.container_id != null) continue;
 
@@ -184,16 +190,43 @@ export function GardenCanvas({
     }
   };
 
+  // Проверки после всех хуков
   if (isLoading) return <div>Загрузка...</div>;
 
+  if (!zone) {
+    return (
+      <div className="canvas-empty">
+        <p>Нет выбранной зоны. Создайте зону, чтобы начать.</p>
+      </div>
+    );
+  }
+
+  // TypeScript гарантирует zone !== null после этой проверки
+  const activeZone: Zone = zone;
+
   return (
-    <Stage width={CANVAS_WIDTH} height={CANVAS_HEIGHT} onClick={handleStageClick}>
-      <CanvasGrid width={CANVAS_WIDTH} height={CANVAS_HEIGHT} cellSize={GRID_SIZE} />
+    <Stage
+      width={activeZone.canvas_width}
+      height={activeZone.canvas_height}
+      onClick={handleStageClick}
+    >
+      {/* 1. Фон зоны с полками */}
+      <ZoneBackground zone={activeZone} />
+
+      {/* 2. Сетка */}
+      <CanvasGrid
+        width={activeZone.canvas_width}
+        height={activeZone.canvas_height}
+        cellSize={activeZone.grid_size}
+      />
+
+      {/* 3. Контейнеры текущей зоны */}
       <Layer>
-        {containers.map((container) => (
+        {zoneContainers.map((container) => (
           <ContainerShape
             key={container.id}
             container={container}
+            zone={activeZone}
             plants={plantsByContainer.get(container.id) ?? []}
             batches={batchesByContainer.get(container.id) ?? []}
             isSelected={selectedId === container.id}

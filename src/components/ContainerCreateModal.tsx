@@ -2,15 +2,17 @@ import { useContainerStore } from '../store/useContainerStore';
 import { ContainerForm, type ContainerFormData } from './ContainerForm';
 
 interface ContainerCreateModalProps {
+  zoneId: number;
   onClose: () => void;
 }
 
-export function ContainerCreateModal({ onClose }: ContainerCreateModalProps) {
+export function ContainerCreateModal({ zoneId, onClose }: ContainerCreateModalProps) {
   const addContainer = useContainerStore((s) => s.addContainer);
 
   const handleSubmit = async (data: ContainerFormData) => {
     await addContainer({
       ...data,
+      zone_id: zoneId,
       x: 100,
       y: 100,
     });

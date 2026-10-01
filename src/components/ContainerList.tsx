@@ -2,6 +2,7 @@ import { useContainerStore } from '../store/useContainerStore';
 
 interface ContainerListProps {
   selectedId: number | null;
+  zoneId: number | null;
   onSelect: (id: number) => void;
   onCreate: () => void;
   onSwitchToBatches: () => void;
@@ -19,12 +20,15 @@ const pxToCm = (px: number) => Math.round(px / PX_PER_CM);
 
 export function ContainerList({
   selectedId,
+  zoneId,
   onSelect,
   onCreate,
   onSwitchToBatches,
 }: ContainerListProps) {
-  const containers = useContainerStore((s) => s.containers);
+  const allContainers = useContainerStore((s) => s.containers);
   const isLoading = useContainerStore((s) => s.isLoading);
+
+  const containers = allContainers.filter((c) => c.zone_id === zoneId);
 
   return (
     <aside className="sidebar">
@@ -44,7 +48,7 @@ export function ContainerList({
       <div className="sidebar-list">
         {isLoading && <p className="muted">Загрузка...</p>}
         {!isLoading && containers.length === 0 && (
-          <p className="muted">Пока нет контейнеров</p>
+          <p className="muted">В этой зоне пока нет контейнеров</p>
         )}
         {containers.map((c) => (
           <button

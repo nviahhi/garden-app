@@ -1,9 +1,7 @@
 import axios from 'axios';
 import type { Container } from '../types';
 
-const api = axios.create({
-  baseURL: '/api',
-});
+const api = axios.create({ baseURL: '/api' });
 
 export const containersApi = {
   getAll: async (): Promise<Container[]> => {
