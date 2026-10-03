@@ -22,6 +22,7 @@ const EVENT_LABELS: Record<string, string> = {
   note: 'Заметка',
   measure: 'Замер',
   water: 'Полив',
+  status_change: 'Смена статуса',
 };
 
 const STATUS_ORDER: PlantStatus[] = ['sown', 'growing', 'flowering', 'fruiting', 'done'];
@@ -174,11 +175,23 @@ export function PlantInfoPanel({ plant, onClose, onTransplant }: PlantInfoPanelP
                     {new Date(e.event_date).toLocaleDateString('ru-RU')}
                   </span>
                 </div>
+
                 {e.event_type === 'transplant' && (
                   <div className="plant-event-detail">
                     {e.from_container_name ?? '?'} → {e.to_container_name ?? '?'}
                   </div>
                 )}
+
+                {e.event_type === 'status_change' && e.from_status && e.to_status && (
+                  <div className="plant-event-detail">
+                    {PLANT_STATUS_EMOJI[e.from_status as PlantStatus] ?? ''}{' '}
+                    {PLANT_STATUS_LABELS[e.from_status as PlantStatus] ?? e.from_status}
+                    {' → '}
+                    {PLANT_STATUS_EMOJI[e.to_status as PlantStatus] ?? ''}{' '}
+                    {PLANT_STATUS_LABELS[e.to_status as PlantStatus] ?? e.to_status}
+                  </div>
+                )}
+
                 {e.notes && <div className="plant-event-notes">{e.notes}</div>}
               </div>
             ))}

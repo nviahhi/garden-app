@@ -183,32 +183,67 @@ router.put('/:id/transplant', async (req, res) => {
 });
 
 // PUT /api/plants/:id/status — сменить статус (собрано, погибло и т.д.)
-// PUT /api/plants/:id/status
+// PUT /api/plants/:id/status — сменить статус растения
 router.put('/:id/status', async (req, res) => {
+  const client = await pool.connect();
+
   try {
+    await client.query('BEGIN');
+
     const { id } = req.params;
     const { status } = req.body;
 
     const allowed = ['sown', 'growing', 'flowering', 'fruiting', 'done'];
     if (!allowed.includes(status)) {
-      return res.status(400).json({ error: `status должен быть одним из: ${allowed.join(', ')}` });
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        error: `status должен быть одним из: ${allowed.join(', ')}`,
+      });
     }
 
-    const result = await pool.query(`
+    // Текущее состояние
+    const currentResult = await client.query(
+      'SELECT * FROM plants WHERE id = $1',
+      [id]
+    );
+
+    if (currentResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Растение не найдено' });
+    }
+
+    const current = currentResult.rows[0];
+
+    // Если статус тот же — ничего не делаем
+    if (current.status === status) {
+      await client.query('ROLLBACK');
+      return res.json(current);
+    }
+
+    // Обновляем статус
+    const updatedResult = await client.query(`
       UPDATE plants
       SET status = $1, updated_at = NOW()
       WHERE id = $2
       RETURNING *
     `, [status, id]);
 
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Растение не найдено' });
-    }
+    // Пишем событие в историю
+    await client.query(`
+      INSERT INTO plant_events 
+        (plant_id, event_type, event_date, from_status, to_status, notes)
+      VALUES ($1, 'status_change', CURRENT_DATE, $2, $3, NULL)
+    `, [id, current.status, status]);
 
-    res.json(result.rows[0]);
+    await client.query('COMMIT');
+
+    res.json(updatedResult.rows[0]);
   } catch (err) {
+    await client.query('ROLLBACK');
     console.error(err);
     res.status(500).json({ error: 'Ошибка смены статуса' });
+  } finally {
+    client.release();
   }
 });
 

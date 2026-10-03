@@ -58,12 +58,14 @@ export interface Plant {
 export interface PlantEvent {
   id: number;
   plant_id: number;
-  event_type: 'transplant' | 'note' | 'measure' | 'water';
+  event_type: 'transplant' | 'note' | 'measure' | 'water' | 'status_change';  
   event_date: string;
   from_container_id: number | null;
   from_cell_index: number | null;
   to_container_id: number | null;
   to_cell_index: number | null;
+  from_status: string | null;
+  to_status: string | null;
   notes: string | null;
   from_container_name?: string | null;
   to_container_name?: string | null;
