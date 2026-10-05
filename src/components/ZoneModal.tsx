@@ -6,7 +6,6 @@ import {
   ZONE_TYPE_EMOJI,
   ZONE_DEFAULTS,
   type ZoneType,
-  type ZoneShelf,
 } from '../types';
 
 interface ZoneModalProps {
@@ -24,47 +23,23 @@ export function ZoneModal({ mode, zoneId, onClose }: ZoneModalProps) {
 
   const [name, setName] = useState('');
   const [type, setType] = useState<ZoneType>('windowsill');
-  const [shelves, setShelves] = useState<Partial<ZoneShelf>[]>([]);
   const [loading, setLoading] = useState(false);
+
+  const [shelfWidthCm, setShelfWidthCm] = useState(80);
+  const [shelfDepthCm, setShelfDepthCm] = useState(30);
+  const [shelfCount, setShelfCount] = useState(4);
 
   useEffect(() => {
     if (mode === 'edit' && zoneId) {
       zonesApi.getOne(zoneId).then((data) => {
         setName(data.name);
         setType(data.type);
-        setShelves(data.shelves ?? []);
+        if (data.shelf_width_cm) setShelfWidthCm(data.shelf_width_cm);
+        if (data.shelf_depth_cm) setShelfDepthCm(data.shelf_depth_cm);
+        if (data.shelf_count) setShelfCount(data.shelf_count);
       });
     }
   }, [mode, zoneId]);
-
-  const handleTypeChange = (newType: ZoneType) => {
-    setType(newType);
-    if (newType === 'shelf' && shelves.length === 0) {
-      setShelves([
-        { name: 'Полка 3', y: 100, height: 200 },
-        { name: 'Полка 2', y: 350, height: 200 },
-        { name: 'Полка 1', y: 600, height: 200 },
-      ]);
-    }
-  };
-
-  const addShelf = () => {
-    const lastY = shelves.length > 0
-      ? Math.max(...shelves.map((s) => s.y ?? 0))
-      : 0;
-    setShelves([
-      ...shelves,
-      { name: `Полка ${shelves.length + 1}`, y: lastY + 220, height: 200 },
-    ]);
-  };
-
-  const updateShelfField = (index: number, field: string, value: string | number) => {
-    setShelves(shelves.map((s, i) => (i === index ? { ...s, [field]: value } : s)));
-  };
-
-  const removeShelf = (index: number) => {
-    setShelves(shelves.filter((_, i) => i !== index));
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,15 +48,31 @@ export function ZoneModal({ mode, zoneId, onClose }: ZoneModalProps) {
     setLoading(true);
     const defaults = ZONE_DEFAULTS[type];
 
-    const payload = {
+    let payload: Parameters<typeof createZone>[0] = {
       name: name.trim(),
       type,
-      canvas_width: defaults.width,
-      canvas_height: defaults.height,
-      px_per_cm: defaults.pxPerCm,
-      background_color: defaults.bg,
-      shelves: type === 'shelf' ? shelves : undefined,
     };
+
+    if (type === 'shelf') {
+      payload = {
+        ...payload,
+        background_color: defaults.bg,
+        grid_size: 20,
+        shelf_width_cm: shelfWidthCm,
+        shelf_depth_cm: shelfDepthCm,
+        shelf_count: shelfCount,
+      };
+      // canvas_width и canvas_height вычисляются на backend
+    } else {
+      payload = {
+        ...payload,
+        canvas_width: defaults.width,
+        canvas_height: defaults.height,
+        px_per_cm: defaults.pxPerCm,
+        background_color: defaults.bg,
+        grid_size: 20,
+      };
+    }
 
     let ok = false;
     if (mode === 'create') {
@@ -111,14 +102,14 @@ export function ZoneModal({ mode, zoneId, onClose }: ZoneModalProps) {
           <button className="btn-icon" onClick={onClose} aria-label="Закрыть">×</button>
         </div>
 
-        <form className="container-form" onSubmit={handleSubmit}>
+        <form className="zone-form" onSubmit={handleSubmit}>
           <label className="field">
             <span>Название *</span>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Например, Подоконник на кухне"
+              placeholder="Например, Стеллаж у окна"
               autoFocus
             />
           </label>
@@ -131,7 +122,7 @@ export function ZoneModal({ mode, zoneId, onClose }: ZoneModalProps) {
                   key={t}
                   type="button"
                   className={`zone-type-btn ${type === t ? 'is-active' : ''}`}
-                  onClick={() => handleTypeChange(t)}
+                  onClick={() => setType(t)}
                 >
                   <span className="zone-type-emoji">{ZONE_TYPE_EMOJI[t]}</span>
                   <span className="zone-type-label">{ZONE_TYPE_LABELS[t]}</span>
@@ -141,45 +132,60 @@ export function ZoneModal({ mode, zoneId, onClose }: ZoneModalProps) {
           </div>
 
           {type === 'shelf' && (
-            <div className="field">
-              <span>Полки</span>
-              <div className="shelves-editor">
-                {shelves.map((s, i) => (
-                  <div key={i} className="shelf-row">
-                    <input
-                      type="text"
-                      value={s.name ?? ''}
-                      onChange={(e) => updateShelfField(i, 'name', e.target.value)}
-                      placeholder={`Полка ${i + 1}`}
-                      className="shelf-name-input"
-                    />
-                    <input
-                      type="number"
-                      value={s.y ?? 0}
-                      onChange={(e) => updateShelfField(i, 'y', Number(e.target.value))}
-                      title="Верхняя граница (px)"
-                      className="field-narrow"
-                    />
-                    <input
-                      type="number"
-                      value={s.height ?? 200}
-                      onChange={(e) => updateShelfField(i, 'height', Number(e.target.value))}
-                      title="Высота (px)"
-                      className="field-narrow"
-                    />
-                    <button
-                      type="button"
-                      className="btn-icon-sm"
-                      onClick={() => removeShelf(i)}
-                      title="Удалить"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                ))}
-                <button type="button" className="btn btn-ghost btn-block" onClick={addShelf}>
-                  + Добавить полку
-                </button>
+            <div className="shelf-config">
+              <div className="shelf-config-title">Параметры стеллажа</div>
+
+              <div className="shelf-fields">
+                <label className="field field-shelf">
+                  <span>Ширина (см)</span>
+                  <input
+                    type="number"
+                    min={20}
+                    max={500}
+                    step={1}
+                    value={shelfWidthCm}
+                    onChange={(e) => setShelfWidthCm(Number(e.target.value))}
+                  />
+                </label>
+
+                <label className="field field-shelf">
+                  <span>Глубина (см)</span>
+                  <input
+                    type="number"
+                    min={10}
+                    max={200}
+                    step={1}
+                    value={shelfDepthCm}
+                    onChange={(e) => setShelfDepthCm(Number(e.target.value))}
+                  />
+                </label>
+
+                <label className="field field-shelf">
+                  <span>Полок</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={10}
+                    step={1}
+                    value={shelfCount}
+                    onChange={(e) => setShelfCount(Number(e.target.value))}
+                  />
+                </label>
+              </div>
+
+              <div className="shelf-preview">
+                <div className="shelf-preview-label">
+                  Превью · {shelfWidthCm}×{shelfDepthCm} см · {shelfCount} полок
+                </div>
+                <div className="shelf-preview-canvas">
+                  {Array.from({ length: shelfCount }).map((_, i) => (
+                    <div key={i} className="shelf-preview-row">
+                      <span className="shelf-preview-name">
+                        Полка {shelfCount - i}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           )}

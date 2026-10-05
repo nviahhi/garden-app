@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db');
 
+const PX_PER_CM_SHELF = 10;  // масштаб для стеллажа
+
 // GET /api/zones — все зоны с количеством контейнеров
 router.get('/', async (req, res) => {
   try {
@@ -51,7 +53,6 @@ router.get('/:id', async (req, res) => {
 });
 
 // POST /api/zones — создать зону
-// Body: { name, type, canvas_width?, canvas_height?, px_per_cm?, background_color?, grid_size? }
 router.post('/', async (req, res) => {
   const client = await pool.connect();
   try {
@@ -65,7 +66,9 @@ router.post('/', async (req, res) => {
       px_per_cm,
       background_color,
       grid_size,
-      shelves,   // массив { name, y, height, color }
+      shelf_width_cm,
+      shelf_depth_cm,
+      shelf_count,
     } = req.body;
 
     if (!name || !type) {
@@ -73,37 +76,66 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Обязательные поля: name, type' });
     }
 
+    let finalCanvasWidth = canvas_width || 1200;
+    let finalCanvasHeight = canvas_height || 800;
+    let finalPxPerCm = px_per_cm || 20;
+
+    // Для стеллажа — вычисляем канвас из реальных размеров
+    if (
+      type === 'shelf' &&
+      shelf_width_cm &&
+      shelf_depth_cm &&
+      shelf_count
+    ) {
+      finalPxPerCm = PX_PER_CM_SHELF;
+      finalCanvasWidth = shelf_width_cm * PX_PER_CM_SHELF;
+      finalCanvasHeight = shelf_depth_cm * shelf_count * PX_PER_CM_SHELF;
+    }
+
     const zoneResult = await client.query(`
-      INSERT INTO zones (name, type, canvas_width, canvas_height, px_per_cm, background_color, grid_size)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      INSERT INTO zones (
+        name, type, canvas_width, canvas_height, px_per_cm,
+        background_color, grid_size,
+        shelf_width_cm, shelf_depth_cm, shelf_count
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       RETURNING *
     `, [
       name,
       type,
-      canvas_width || 1200,
-      canvas_height || 800,
-      px_per_cm || 20,
+      finalCanvasWidth,
+      finalCanvasHeight,
+      finalPxPerCm,
       background_color || '#faf6ef',
       grid_size || 20,
+      shelf_width_cm || null,
+      shelf_depth_cm || null,
+      shelf_count || null,
     ]);
 
     const zone = zoneResult.rows[0];
 
-    // Полки — только для типа 'shelf'
+    // Генерация полок для стеллажа
     let createdShelves = [];
-    if (type === 'shelf' && Array.isArray(shelves) && shelves.length > 0) {
-      for (let i = 0; i < shelves.length; i++) {
-        const s = shelves[i];
+    if (
+      type === 'shelf' &&
+      shelf_count &&
+      shelf_count > 0 &&
+      shelf_depth_cm
+    ) {
+      const shelfHeightPx = Math.round(shelf_depth_cm * finalPxPerCm);
+
+      for (let i = 0; i < shelf_count; i++) {
         const shelfResult = await client.query(`
           INSERT INTO zone_shelves (zone_id, name, y, height, color, sort_order)
           VALUES ($1, $2, $3, $4, $5, $6)
           RETURNING *
         `, [
           zone.id,
-          s.name || `Полка ${i + 1}`,
-          s.y ?? 100 + i * 220,
-          s.height || 200,
-          s.color || '#f5f0e6',
+          `Полка ${shelf_count - i}`,
+          i * shelfHeightPx,
+          shelfHeightPx,
+          '#f5f0e6',
           i,
         ]);
         createdShelves.push(shelfResult.rows[0]);
@@ -125,7 +157,7 @@ router.post('/', async (req, res) => {
   }
 });
 
-// PUT /api/zones/:id — обновить зону (с пересозданием полок)
+// PUT /api/zones/:id — обновить зону
 router.put('/:id', async (req, res) => {
   const client = await pool.connect();
   try {
@@ -140,60 +172,112 @@ router.put('/:id', async (req, res) => {
       px_per_cm,
       background_color,
       grid_size,
-      shelves,
+      shelf_width_cm,
+      shelf_depth_cm,
+      shelf_count,
     } = req.body;
 
-    const zoneResult = await client.query(`
-      UPDATE zones
-      SET name = COALESCE($1, name),
-          type = COALESCE($2, type),
-          canvas_width = COALESCE($3, canvas_width),
-          canvas_height = COALESCE($4, canvas_height),
-          px_per_cm = COALESCE($5, px_per_cm),
-          background_color = COALESCE($6, background_color),
-          grid_size = COALESCE($7, grid_size)
-      WHERE id = $8
-      RETURNING *
-    `, [
-      name, type, canvas_width, canvas_height,
-      px_per_cm, background_color, grid_size, id,
-    ]);
+    const currentResult = await client.query(
+      'SELECT * FROM zones WHERE id = $1',
+      [id]
+    );
 
-    if (zoneResult.rows.length === 0) {
+    if (currentResult.rows.length === 0) {
       await client.query('ROLLBACK');
       return res.status(404).json({ error: 'Зона не найдена' });
     }
 
-    // Если переданы shelves — пересоздаём
-    if (Array.isArray(shelves)) {
+    const current = currentResult.rows[0];
+
+    const effectiveType = type ?? current.type;
+    const effectiveShelfWidth = shelf_width_cm ?? current.shelf_width_cm;
+    const effectiveShelfDepth = shelf_depth_cm ?? current.shelf_depth_cm;
+    const effectiveShelfCount = shelf_count ?? current.shelf_count;
+
+    let finalCanvasWidth = canvas_width ?? current.canvas_width;
+    let finalCanvasHeight = canvas_height ?? current.canvas_height;
+    let finalPxPerCm = px_per_cm ?? current.px_per_cm;
+
+    // Для стеллажа — вычисляем канвас из реальных размеров
+    if (
+      effectiveType === 'shelf' &&
+      effectiveShelfWidth &&
+      effectiveShelfDepth &&
+      effectiveShelfCount
+    ) {
+      finalPxPerCm = PX_PER_CM_SHELF;
+      finalCanvasWidth = effectiveShelfWidth * PX_PER_CM_SHELF;
+      finalCanvasHeight = effectiveShelfDepth * effectiveShelfCount * PX_PER_CM_SHELF;
+    }
+
+    const zoneResult = await client.query(`
+      UPDATE zones
+      SET name = $1,
+          type = $2,
+          canvas_width = $3,
+          canvas_height = $4,
+          px_per_cm = $5,
+          background_color = $6,
+          grid_size = $7,
+          shelf_width_cm = $8,
+          shelf_depth_cm = $9,
+          shelf_count = $10
+      WHERE id = $11
+      RETURNING *
+    `, [
+      name ?? current.name,
+      effectiveType,
+      finalCanvasWidth,
+      finalCanvasHeight,
+      finalPxPerCm,
+      background_color ?? current.background_color,
+      grid_size ?? current.grid_size,
+      effectiveShelfWidth,
+      effectiveShelfDepth,
+      effectiveShelfCount,
+      id,
+    ]);
+
+    const updatedZone = zoneResult.rows[0];
+
+    // Пересоздаём полки для стеллажа
+    if (updatedZone.type === 'shelf') {
       await client.query('DELETE FROM zone_shelves WHERE zone_id = $1', [id]);
 
-      for (let i = 0; i < shelves.length; i++) {
-        const s = shelves[i];
-        await client.query(`
-          INSERT INTO zone_shelves (zone_id, name, y, height, color, sort_order)
-          VALUES ($1, $2, $3, $4, $5, $6)
-        `, [
-          id,
-          s.name || `Полка ${i + 1}`,
-          s.y ?? 100 + i * 220,
-          s.height || 200,
-          s.color || '#f5f0e6',
-          i,
-        ]);
+      if (
+        updatedZone.shelf_count > 0 &&
+        updatedZone.shelf_depth_cm &&
+        updatedZone.px_per_cm
+      ) {
+        const shelfHeightPx = Math.round(
+          updatedZone.shelf_depth_cm * updatedZone.px_per_cm
+        );
+
+        for (let i = 0; i < updatedZone.shelf_count; i++) {
+          await client.query(`
+            INSERT INTO zone_shelves (zone_id, name, y, height, color, sort_order)
+            VALUES ($1, $2, $3, $4, $5, $6)
+          `, [
+            id,
+            `Полка ${updatedZone.shelf_count - i}`,
+            i * shelfHeightPx,
+            shelfHeightPx,
+            '#f5f0e6',
+            i,
+          ]);
+        }
       }
     }
 
     await client.query('COMMIT');
 
-    // Возвращаем обновлённую зону с полками
     const shelvesResult = await pool.query(
       'SELECT * FROM zone_shelves WHERE zone_id = $1 ORDER BY y ASC',
       [id]
     );
 
     res.json({
-      ...zoneResult.rows[0],
+      ...updatedZone,
       shelves: shelvesResult.rows,
     });
   } catch (err) {
@@ -205,7 +289,7 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-// DELETE /api/zones/:id — удалить зону (каскадно удалит контейнеры)
+// DELETE /api/zones/:id
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;

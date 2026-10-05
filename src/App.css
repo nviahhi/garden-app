@@ -88,9 +88,10 @@ button {
 
 /* === Canvas area === */
 .canvas-area {
-  padding: 24px;
-  overflow: auto;
+  padding: 16px;
+  overflow: hidden;
   background: #f5f5f0;
+  min-width: 0;
 }
 
 /* === Edit panel === */
@@ -963,34 +964,175 @@ button {
   max-width: calc(100vw - 32px);
 }
 
-/* Редактор полок */
-.shelves-editor {
+/* Форма зоны */
+.zone-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Секция параметров стеллажа */
+.shelf-config {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  background: #fafaf5;
+  border: 1px solid #e0e0d0;
+  border-radius: 8px;
+}
+
+.shelf-config-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b8e6b;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+/* Три поля в ряд */
+.shelf-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px;
+}
+
+.field-shelf input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #d0d0c0;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+  background: #fafaf5;
+  color: #2e4a2e;
+  text-align: center;
+}
+
+.field-shelf input:focus {
+  outline: none;
+  border-color: #4a7c4a;
+  background: white;
+}
+
+.field-shelf > span {
+  font-size: 11px;
+  color: #6b8e6b;
+  font-weight: 500;
+  text-align: center;
+}
+
+/* Превью стеллажа */
+.shelf-preview {
   display: flex;
   flex-direction: column;
   gap: 6px;
   margin-top: 4px;
 }
 
-.shelf-row {
+.shelf-preview-label {
+  font-size: 11px;
+  color: #8b7355;
+  font-weight: 500;
+}
+
+.shelf-preview-canvas {
   display: flex;
-  gap: 6px;
+  flex-direction: column;
+  border: 1px solid #d0c8b8;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #faf6ef;
+}
+
+.shelf-preview-row {
+  display: flex;
   align-items: center;
+  padding: 0 10px;
+  min-height: 32px;
+  background: #f5f0e6;
+  border-bottom: 4px solid #c89860;
+  font-size: 11px;
+  color: #6b5b45;
 }
 
-.shelf-name-input {
-  flex: 1;
-  padding: 6px 8px;
-  border: 1px solid #d0d0c0;
+.shelf-preview-row:last-child {
+  border-bottom: none;
+  border-top: none;
+  border-bottom: 4px solid #c89860;
+}
+
+.shelf-preview-name {
+  font-weight: 600;
+}
+
+/* Обёртка канваса */
+.canvas-wrapper {
+  position: relative;
+  width: 100%;
+  height: calc(100vh - 200px);
+  min-height: 500px;
+}
+
+.canvas-container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: auto;
+  background: #f0ede3;
+  border-radius: 8px;
+  border: 1px solid #e0d8c8;
+}
+
+/* Панель zoom */
+.canvas-zoom {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 10;
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e0d8c8;
+}
+
+.zoom-btn {
+  min-width: 34px;
+  height: 30px;
+  padding: 0 8px;
+  background: transparent;
+  border: 1px solid transparent;
   border-radius: 6px;
-  font-size: 13px;
-  font-family: inherit;
-  background: #fafaf5;
   color: #2e4a2e;
-  min-width: 0;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.shelf-name-input:focus {
-  outline: none;
+.zoom-btn:hover:not(:disabled) {
+  background: #e8f5e9;
   border-color: #4a7c4a;
-  background: white;
+}
+
+.zoom-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.zoom-btn-fit {
+  font-size: 12px;
+  min-width: 52px;
+  background: #f5f0e6;
 }

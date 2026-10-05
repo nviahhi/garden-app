@@ -1,6 +1,6 @@
 import { Stage, Layer, Rect, Text, Group } from 'react-konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useContainerStore } from '../store/useContainerStore';
 import { useBatchStore } from '../store/useBatchStore';
 import { useZoneStore } from '../store/useZoneStore';
@@ -31,7 +31,6 @@ function ContainerShape({
   onBatchClick,
 }: {
   container: Container;
-  zone: Zone;
   plants: Plant[];
   batches: Batch[];
   isSelected: boolean;
@@ -97,7 +96,7 @@ function ContainerShape({
       />
       <Text
         x={8}
-        y={36}
+        y={26}
         width={container.width - 16}
         text={container.type}
         fontSize={11}
@@ -131,13 +130,53 @@ export function GardenCanvas({
   const loadPlants = useBatchStore((s) => s.loadPlants);
   const loadBatches = useBatchStore((s) => s.loadBatches);
 
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [fitScale, setFitScale] = useState(1);
+  const [zoom, setZoom] = useState(1);
+
+  // Итоговый масштаб
+  const scale = fitScale * zoom;
+
   useEffect(() => {
     loadContainers();
     loadPlants();
     loadBatches();
   }, [loadContainers, loadPlants, loadBatches]);
 
-  // Контейнеры текущей зоны
+  // ===== Автоматическая подгонка под размер контейнера =====
+  useEffect(() => {
+    if (!zone || !containerRef.current) return;
+
+    const el = containerRef.current;
+
+    const updateFitScale = () => {
+      const availableWidth = el.clientWidth;
+      const availableHeight = el.clientHeight;
+
+      const padding = 32;
+      const maxW = availableWidth - padding;
+      const maxH = availableHeight - padding;
+
+      const scaleX = maxW / zone.canvas_width;
+      const scaleY = maxH / zone.canvas_height;
+
+      const newScale = Math.min(1, scaleX, scaleY);
+      setFitScale(newScale);
+    };
+
+    updateFitScale();
+
+    const observer = new ResizeObserver(updateFitScale);
+    observer.observe(el);
+
+    return () => observer.disconnect();
+  }, [zone]);
+
+  // ===== Управление zoom =====
+  const handleZoomIn = () => setZoom((z) => Math.min(3, +(z + 0.1).toFixed(2)));
+  const handleZoomOut = () => setZoom((z) => Math.max(0.3, +(z - 0.1).toFixed(2)));
+  const handleZoomFit = () => setZoom(1);
+
   const zoneContainers = useMemo(
     () => containers.filter((c) => c.zone_id === zone?.id),
     [containers, zone]
@@ -157,6 +196,7 @@ export function GardenCanvas({
   const batchesByContainer = useMemo(() => {
     const map = new Map<number, Batch[]>();
 
+    // 1. Партии с явным container_id (россыпь, ячейки)
     for (const batch of batches) {
       if (batch.container_id != null) {
         const list = map.get(batch.container_id) ?? [];
@@ -165,6 +205,7 @@ export function GardenCanvas({
       }
     }
 
+    // 2. Партии, распределённые по горшкам (container_id = null)
     for (const batch of batches) {
       if (batch.container_id != null) continue;
 
@@ -190,7 +231,6 @@ export function GardenCanvas({
     }
   };
 
-  // Проверки после всех хуков
   if (isLoading) return <div>Загрузка...</div>;
 
   if (!zone) {
@@ -201,42 +241,77 @@ export function GardenCanvas({
     );
   }
 
-  // TypeScript гарантирует zone !== null после этой проверки
   const activeZone: Zone = zone;
 
   return (
-    <Stage
-      width={activeZone.canvas_width}
-      height={activeZone.canvas_height}
-      onClick={handleStageClick}
-    >
-      {/* 1. Фон зоны с полками */}
-      <ZoneBackground zone={activeZone} />
+    <div className="canvas-wrapper">
+      {/* Панель zoom */}
+      <div className="canvas-zoom">
+        <button
+          className="zoom-btn"
+          onClick={handleZoomOut}
+          title="Уменьшить"
+          disabled={zoom <= 0.3}
+        >
+          −
+        </button>
+        <button
+          className="zoom-btn zoom-btn-fit"
+          onClick={handleZoomFit}
+          title="По размеру экрана"
+        >
+          {Math.round(zoom * 100)}%
+        </button>
+        <button
+          className="zoom-btn"
+          onClick={handleZoomIn}
+          title="Увеличить"
+          disabled={zoom >= 3}
+        >
+          +
+        </button>
+      </div>
 
-      {/* 2. Сетка */}
-      <CanvasGrid
-        width={activeZone.canvas_width}
-        height={activeZone.canvas_height}
-        cellSize={activeZone.grid_size}
-      />
+      <div ref={containerRef} className="canvas-container">
+        <Stage
+          width={activeZone.canvas_width * scale}
+          height={activeZone.canvas_height * scale}
+          scaleX={scale}
+          scaleY={scale}
+          onClick={handleStageClick}
+        >
+          {/* 1. Фон зоны с полками */}
+          <Layer listening={false}>
+            <ZoneBackground zone={activeZone} />
+          </Layer>
 
-      {/* 3. Контейнеры текущей зоны */}
-      <Layer>
-        {zoneContainers.map((container) => (
-          <ContainerShape
-            key={container.id}
-            container={container}
-            zone={activeZone}
-            plants={plantsByContainer.get(container.id) ?? []}
-            batches={batchesByContainer.get(container.id) ?? []}
-            isSelected={selectedId === container.id}
-            isHighlighted={highlightedContainerIds?.has(container.id) ?? false}
-            onSelect={() => onSelect(container.id)}
-            onPlantClick={onPlantClick}
-            onBatchClick={onBatchClick}
-          />
-        ))}
-      </Layer>
-    </Stage>
+          {/* 2. Сетка */}
+          <Layer listening={false}>
+            <CanvasGrid
+              width={activeZone.canvas_width}
+              height={activeZone.canvas_height}
+              cellSize={activeZone.grid_size}
+            />
+          </Layer>
+
+          {/* 3. Контейнеры */}
+          <Layer>
+            {zoneContainers.map((container) => (
+              <ContainerShape
+                key={container.id}
+                container={container}
+                plants={plantsByContainer.get(container.id) ?? []}
+                batches={batchesByContainer.get(container.id) ?? []}
+                isSelected={selectedId === container.id}
+                isHighlighted={highlightedContainerIds?.has(container.id) ?? false}
+                onSelect={() => onSelect(container.id)}
+                onPlantClick={onPlantClick}
+                onBatchClick={onBatchClick}
+              />
+            ))}
+          </Layer>
+        </Stage>
+      </div>
+    </div>
   );
 }

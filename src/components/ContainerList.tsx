@@ -15,7 +15,8 @@ const TYPE_LABELS: Record<string, string> = {
   greenhouse: 'Теплица',
 };
 
-const PX_PER_CM = 20;
+// Единый масштаб: 1 см = 10 px
+const PX_PER_CM = 10;
 const pxToCm = (px: number) => Math.round(px / PX_PER_CM);
 
 export function ContainerList({

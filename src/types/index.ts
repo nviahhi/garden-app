@@ -126,6 +126,9 @@ export interface Zone {
   created_at: string;
   containers_count?: number;
   shelves?: ZoneShelf[];
+  shelf_width_cm: number | null;
+  shelf_depth_cm: number | null;
+  shelf_count: number | null;
 }
 
 export const ZONE_TYPE_LABELS: Record<ZoneType, string> = {

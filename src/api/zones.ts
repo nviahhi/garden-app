@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { Zone, ZoneShelf, ZoneType } from '../types';
+import type { Zone, ZoneType } from '../types';
 
 const api = axios.create({ baseURL: '/api' });
 
@@ -11,7 +11,9 @@ export interface CreateZonePayload {
   px_per_cm?: number;
   background_color?: string;
   grid_size?: number;
-  shelves?: Partial<ZoneShelf>[];
+  shelf_width_cm?: number;
+  shelf_depth_cm?: number;
+  shelf_count?: number;
 }
 
 export const zonesApi = {

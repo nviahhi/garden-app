@@ -24,17 +24,16 @@ const TYPE_OPTIONS: { value: Container['type']; label: string }[] = [
   { value: 'greenhouse', label: 'Теплица' },
 ];
 
-// 1 см = 20 px (соответствует размеру клетки сетки)
-const PX_PER_CM = 20;
+// Единый масштаб: 1 см = 10 px
+const PX_PER_CM = 10;
 
-const pxToCm = (px: number) => Math.round((px / PX_PER_CM) * 10) / 10;
+const pxToCm = (px: number) => Math.round(px / PX_PER_CM);
 const cmToPx = (cm: number) => Math.round(cm * PX_PER_CM);
 
 export function ContainerForm({ initial, onSubmit, onCancel, submitLabel }: ContainerFormProps) {
   const [name, setName] = useState(initial?.name ?? '');
   const [type, setType] = useState<Container['type']>(initial?.type ?? 'pot');
 
-  // Показываем в см, но внутри формы держим см до отправки
   const [widthCm, setWidthCm] = useState(pxToCm(initial?.width ?? 80));
   const [heightCm, setHeightCm] = useState(pxToCm(initial?.height ?? 40));
 
@@ -64,7 +63,7 @@ export function ContainerForm({ initial, onSubmit, onCancel, submitLabel }: Cont
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="Например, Кассета №1"
+          placeholder="Например, Плошка №1"
           autoFocus
         />
       </label>
@@ -85,7 +84,7 @@ export function ContainerForm({ initial, onSubmit, onCancel, submitLabel }: Cont
             type="number"
             min={2}
             max={500}
-			step={1}
+            step={1}
             value={widthCm}
             onChange={(e) => setWidthCm(Number(e.target.value))}
             className="field-narrow"
@@ -97,7 +96,7 @@ export function ContainerForm({ initial, onSubmit, onCancel, submitLabel }: Cont
             type="number"
             min={2}
             max={500}
-			step={1}
+            step={1}
             value={heightCm}
             onChange={(e) => setHeightCm(Number(e.target.value))}
             className="field-narrow"

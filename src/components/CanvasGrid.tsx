@@ -1,4 +1,4 @@
-import { Layer, Path } from 'react-konva';
+import { Group, Path } from 'react-konva';
 
 interface CanvasGridProps {
   width: number;
@@ -23,8 +23,8 @@ export function CanvasGrid({
   }
 
   return (
-    <Layer listening={false}>
+    <Group listening={false}>
       <Path data={path} stroke={color} strokeWidth={0.5} />
-    </Layer>
+    </Group>
   );
 }
