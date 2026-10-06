@@ -1,5 +1,6 @@
 import { Stage, Layer, Rect, Text, Group } from 'react-konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
+import type Konva from 'konva';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useContainerStore } from '../store/useContainerStore';
 import { useBatchStore } from '../store/useBatchStore';
@@ -29,6 +30,7 @@ function ContainerShape({
   onSelect,
   onPlantClick,
   onBatchClick,
+  onHoverChange,
 }: {
   container: Container;
   plants: Plant[];
@@ -38,6 +40,7 @@ function ContainerShape({
   onSelect: () => void;
   onPlantClick?: (plant: Plant) => void;
   onBatchClick?: (batch: Batch) => void;
+  onHoverChange: (hovered: boolean) => void;
 }) {
   const updateContainer = useContainerStore((s) => s.updateContainer);
 
@@ -62,6 +65,8 @@ function ContainerShape({
       onClick={onSelect}
       onTap={onSelect}
       onDragEnd={handleDragEnd}
+      onMouseEnter={() => onHoverChange(true)}
+      onMouseLeave={() => onHoverChange(false)}
     >
       <Rect
         width={container.width}
@@ -96,7 +101,7 @@ function ContainerShape({
       />
       <Text
         x={8}
-        y={26}
+        y={36}
         width={container.width - 16}
         text={container.type}
         fontSize={11}
@@ -131,10 +136,12 @@ export function GardenCanvas({
   const loadBatches = useBatchStore((s) => s.loadBatches);
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const stageRef = useRef<Konva.Stage>(null);
   const [fitScale, setFitScale] = useState(1);
   const [zoom, setZoom] = useState(1);
+  const [isOverContainer, setOverContainer] = useState(false);
+  const [isPanning, setPanning] = useState(false);
 
-  // Итоговый масштаб
   const scale = fitScale * zoom;
 
   useEffect(() => {
@@ -172,10 +179,73 @@ export function GardenCanvas({
     return () => observer.disconnect();
   }, [zone]);
 
-  // ===== Управление zoom =====
+  // ===== Сброс вида при смене зоны =====
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setZoom(1);
+    if (stageRef.current) {
+      stageRef.current.position({ x: 0, y: 0 });
+    }
+  }, [zone?.id]);
+
+  // ===== Курсор =====
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    const container = stage.container();
+
+    if (isPanning) {
+      container.style.cursor = 'grabbing';
+    } else if (isOverContainer) {
+      container.style.cursor = 'move';
+    } else {
+      container.style.cursor = 'grab';
+    }
+  }, [isOverContainer, isPanning]);
+
+  // ===== Zoom колесом мыши =====
+  const handleWheel = (e: KonvaEventObject<WheelEvent>) => {
+    e.evt.preventDefault();
+
+    const stage = stageRef.current;
+    if (!stage) return;
+
+    const oldScale = scale;
+    const pointer = stage.getPointerPosition();
+    if (!pointer) return;
+
+    const direction = e.evt.deltaY > 0 ? -1 : 1;
+    const zoomStep = 0.1;
+
+    let newZoom = direction > 0 ? zoom + zoomStep : zoom - zoomStep;
+    newZoom = Math.max(0.3, Math.min(3, +newZoom.toFixed(2)));
+
+    if (newZoom === zoom) return;
+
+    const newScale = fitScale * newZoom;
+
+    const mousePointTo = {
+      x: (pointer.x - stage.x()) / oldScale,
+      y: (pointer.y - stage.y()) / oldScale,
+    };
+
+    const newPos = {
+      x: pointer.x - mousePointTo.x * newScale,
+      y: pointer.y - mousePointTo.y * newScale,
+    };
+
+    stage.position(newPos);
+    setZoom(newZoom);
+  };
+
   const handleZoomIn = () => setZoom((z) => Math.min(3, +(z + 0.1).toFixed(2)));
   const handleZoomOut = () => setZoom((z) => Math.max(0.3, +(z - 0.1).toFixed(2)));
-  const handleZoomFit = () => setZoom(1);
+  const handleZoomFit = () => {
+    setZoom(1);
+    if (stageRef.current) {
+      stageRef.current.position({ x: 0, y: 0 });
+    }
+  };
 
   const zoneContainers = useMemo(
     () => containers.filter((c) => c.zone_id === zone?.id),
@@ -196,7 +266,6 @@ export function GardenCanvas({
   const batchesByContainer = useMemo(() => {
     const map = new Map<number, Batch[]>();
 
-    // 1. Партии с явным container_id (россыпь, ячейки)
     for (const batch of batches) {
       if (batch.container_id != null) {
         const list = map.get(batch.container_id) ?? [];
@@ -205,7 +274,6 @@ export function GardenCanvas({
       }
     }
 
-    // 2. Партии, распределённые по горшкам (container_id = null)
     for (const batch of batches) {
       if (batch.container_id != null) continue;
 
@@ -231,6 +299,15 @@ export function GardenCanvas({
     }
   };
 
+  const handleStageDblClick = () => {
+    if (stageRef.current) {
+      stageRef.current.position({ x: 0, y: 0 });
+    }
+  };
+
+  const handleStageDragStart = () => setPanning(true);
+  const handleStageDragEnd = () => setPanning(false);
+
   if (isLoading) return <div>Загрузка...</div>;
 
   if (!zone) {
@@ -245,7 +322,6 @@ export function GardenCanvas({
 
   return (
     <div className="canvas-wrapper">
-      {/* Панель zoom */}
       <div className="canvas-zoom">
         <button
           className="zoom-btn"
@@ -274,18 +350,22 @@ export function GardenCanvas({
 
       <div ref={containerRef} className="canvas-container">
         <Stage
+          ref={stageRef}
           width={activeZone.canvas_width * scale}
           height={activeZone.canvas_height * scale}
           scaleX={scale}
           scaleY={scale}
+          draggable={!isOverContainer}
           onClick={handleStageClick}
+          onDblClick={handleStageDblClick}
+          onDragStart={handleStageDragStart}
+          onDragEnd={handleStageDragEnd}
+          onWheel={handleWheel}
         >
-          {/* 1. Фон зоны с полками */}
           <Layer listening={false}>
             <ZoneBackground zone={activeZone} />
           </Layer>
 
-          {/* 2. Сетка */}
           <Layer listening={false}>
             <CanvasGrid
               width={activeZone.canvas_width}
@@ -294,7 +374,6 @@ export function GardenCanvas({
             />
           </Layer>
 
-          {/* 3. Контейнеры */}
           <Layer>
             {zoneContainers.map((container) => (
               <ContainerShape
@@ -307,6 +386,7 @@ export function GardenCanvas({
                 onSelect={() => onSelect(container.id)}
                 onPlantClick={onPlantClick}
                 onBatchClick={onBatchClick}
+                onHoverChange={setOverContainer}
               />
             ))}
           </Layer>

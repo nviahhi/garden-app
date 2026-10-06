@@ -25,7 +25,7 @@ export function BatchList({
   return (
     <aside className="sidebar">
       <div className="sidebar-header">
-        <h2>🌱 Мой сад</h2>
+        <h2>🌱 Журнал рассады</h2>
       </div>
 
       <div className="sidebar-tabs">

@@ -1080,10 +1080,11 @@ button {
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: auto;
+  overflow: hidden; /* ← было auto */
   background: #f0ede3;
   border-radius: 8px;
   border: 1px solid #e0d8c8;
+  position: relative;
 }
 
 /* Панель zoom */
@@ -1099,6 +1100,25 @@ button {
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   border: 1px solid #e0d8c8;
+}
+
+.zoom-btn.is-active {
+  background: #4a7c4a;
+  color: white;
+  border-color: #4a7c4a;
+}
+
+.zoom-btn.is-active:hover {
+  background: #3d683d;
+  border-color: #3d683d;
+}
+
+.zoom-separator {
+  width: 1px;
+  height: 20px;
+  background: #e0d8c8;
+  margin: 0 2px;
+  align-self: center;
 }
 
 .zoom-btn {
