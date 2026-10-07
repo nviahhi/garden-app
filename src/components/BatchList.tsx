@@ -1,4 +1,6 @@
 import { useBatchStore } from '../store/useBatchStore';
+import { useContainerStore } from '../store/useContainerStore';
+import { useZoneStore } from '../store/useZoneStore';
 import type { Batch } from '../types';
 
 interface BatchListProps {
@@ -17,8 +19,34 @@ export function BatchList({
   const batches = useBatchStore((s) => s.batches);
   const plants = useBatchStore((s) => s.plants);
   const isLoading = useBatchStore((s) => s.isLoading);
+  const containers = useContainerStore((s) => s.containers);
+  const currentZone = useZoneStore((s) => s.currentZone);
 
-  const sorted = [...batches].sort((a, b) => {
+  // Контейнеры текущей зоны
+  const zoneContainerIds = new Set(
+    containers
+      .filter((c) => c.zone_id === currentZone?.id)
+      .map((c) => c.id)
+  );
+
+  // Партии, относящиеся к текущей зоне
+  const zoneBatches = batches.filter((batch) => {
+    // Партия в одном контейнере
+    if (batch.container_id != null) {
+      return zoneContainerIds.has(batch.container_id);
+    }
+
+    // Партия распределена по горшкам — проверяем,
+    // есть ли хоть одно растение в контейнере текущей зоны
+    return plants.some(
+      (p) =>
+        p.batch_id === batch.id &&
+        p.container_id != null &&
+        zoneContainerIds.has(p.container_id)
+    );
+  });
+
+  const sorted = [...zoneBatches].sort((a, b) => {
     return new Date(b.sowing_date).getTime() - new Date(a.sowing_date).getTime();
   });
 
@@ -42,14 +70,14 @@ export function BatchList({
       <div className="sidebar-list">
         {isLoading && <p className="muted">Загрузка...</p>}
         {!isLoading && sorted.length === 0 && (
-          <p className="muted">Пока нет партий</p>
+          <p className="muted">В этой зоне пока нет партий</p>
         )}
 
         {sorted.map((batch) => {
           const batchPlants = plants.filter((p) => p.batch_id === batch.id);
 
           const germinated = batchPlants.filter(
-            (p) => p.status !== 'sown' && p.status !== 'dead'
+            (p) => p.status !== 'sown'
           ).length;
 
           // Иконка по статусу

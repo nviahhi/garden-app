@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useBatchStore } from '../store/useBatchStore';
 import { useContainerStore } from '../store/useContainerStore';
+import { useZoneStore } from '../store/useZoneStore';
 
 interface BatchCreateModalProps {
   onClose: () => void;
@@ -10,7 +11,9 @@ interface BatchCreateModalProps {
 type Mode = 'scattered' | 'cells' | 'pots';
 
 export function BatchCreateModal({ onClose, presetContainerId }: BatchCreateModalProps) {
-  const containers = useContainerStore((s) => s.containers);
+  const allContainers = useContainerStore((s) => s.containers);
+  const currentZone = useZoneStore((s) => s.currentZone);
+  const containers = allContainers.filter((c) => c.zone_id === currentZone?.id);
   const createBatch = useBatchStore((s) => s.createBatch);
 
   const [species, setSpecies] = useState('');
