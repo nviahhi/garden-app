@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useContainerStore } from '../store/useContainerStore';
 import { useBatchStore } from '../store/useBatchStore';
+import { useZoneStore } from '../store/useZoneStore';
 import type { Plant } from '../types';
 
 interface TransplantModalProps {
@@ -10,6 +11,7 @@ interface TransplantModalProps {
 
 export function TransplantModal({ plant, onClose }: TransplantModalProps) {
   const containers = useContainerStore((s) => s.containers);
+  const zones = useZoneStore((s) => s.zones);
   const transplantPlant = useBatchStore((s) => s.transplantPlant);
 
   // Исключаем текущий контейнер
@@ -63,37 +65,55 @@ export function TransplantModal({ plant, onClose }: TransplantModalProps) {
           <label className="field">
             <span>Куда пересаживаем? *</span>
             <select
-              value={targetId}
-              onChange={(e) => {
-                setTargetId(e.target.value ? Number(e.target.value) : '');
-                setCellIndex('');
-              }}
-              autoFocus
-            >
+            value={targetId}
+            onChange={(e) => {
+              setTargetId(e.target.value ? Number(e.target.value) : '');
+              setCellIndex('');
+            }}
+            autoFocus
+          >
               <option value="">— выберите контейнер —</option>
-              {availableContainers.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name} ({c.type})
-                  {c.cols && c.rows ? ` — ${c.cols}×${c.rows}` : ''}
-                </option>
-              ))}
+              {zones.map((zone) => {
+                const zoneContainers = availableContainers.filter((c) => c.zone_id === zone.id);
+                if (zoneContainers.length === 0) return null;
+
+                return (
+                  <optgroup key={zone.id} label={zone.name}>
+                    {zoneContainers.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} ({c.type})
+                        {c.cols && c.rows ? ` — ${c.cols}×${c.rows}` : ''}
+                      </option>
+                    ))}
+                  </optgroup>
+                );
+              })}
             </select>
           </label>
 
           {hasGrid && (
             <label className="field">
-              <span>Ячейка (0 — авто)</span>
+              <span>Номер ячейки (1–{totalCells})</span>
               <input
                 type="number"
-                min={0}
-                max={totalCells - 1}
-                value={cellIndex}
-                onChange={(e) => setCellIndex(e.target.value === '' ? '' : Number(e.target.value))}
+                min={1}
+                max={totalCells}
+                value={cellIndex === '' ? '' : cellIndex + 1}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === '') {
+                    setCellIndex('');
+                  } else {
+                    const num = Number(val);
+                    // Сохраняем как 0-индекс внутри (1 → 0, 2 → 1...)
+                    setCellIndex(Math.max(0, Math.min(totalCells - 1, num - 1)));
+                  }
+                }}
                 placeholder="—"
                 className="field-narrow"
               />
               <span className="field-hint">
-                Всего ячеек: {totalCells}
+                 Необязательно. Если не указать — займёт первую свободную.
               </span>
             </label>
           )}

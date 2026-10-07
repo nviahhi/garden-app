@@ -145,7 +145,64 @@ router.put('/:id/transplant', async (req, res) => {
 
     const current = currentResult.rows[0];
 
-    // Пишем событие пересадки
+    // ===== Определяем финальный cell_index =====
+    let finalCellIndex = to_cell_index ?? null;
+
+    // Если целевой контейнер с сеткой и ячейка не указана — ищем первую свободную
+    if (finalCellIndex == null) {
+      const targetContainer = await client.query(
+        'SELECT * FROM containers WHERE id = $1',
+        [to_container_id]
+      );
+
+      const container = targetContainer.rows[0];
+      const hasGrid = container?.cols && container?.rows;
+
+      if (hasGrid) {
+        const totalCells = container.cols * container.rows;
+
+        // Занятые ячейки (кроме текущего растения)
+        const occupied = await client.query(`
+          SELECT cell_index FROM plants
+          WHERE container_id = $1 AND cell_index IS NOT NULL AND id != $2
+        `, [to_container_id, id]);
+
+        const occupiedSet = new Set(occupied.rows.map((r) => r.cell_index));
+
+        // Первая свободная ячейка
+        let freeCell = null;
+        for (let i = 0; i < totalCells; i++) {
+          if (!occupiedSet.has(i)) {
+            freeCell = i;
+            break;
+          }
+        }
+
+        if (freeCell == null) {
+          await client.query('ROLLBACK');
+          return res.status(400).json({
+            error: 'В этой кассете нет свободных ячеек',
+          });
+        }
+
+        finalCellIndex = freeCell;
+      }
+    } else {
+      // Пользователь указал ячейку явно — проверяем, что она свободна
+      const conflict = await client.query(`
+        SELECT id FROM plants
+        WHERE container_id = $1 AND cell_index = $2 AND id != $3
+      `, [to_container_id, finalCellIndex, id]);
+
+      if (conflict.rows.length > 0) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({
+          error: `Ячейка #${finalCellIndex + 1} уже занята`,
+        });
+      }
+    }
+
+    // ===== Пишем событие пересадки =====
     await client.query(`
       INSERT INTO plant_events 
         (plant_id, event_type, event_date, from_container_id, from_cell_index,
@@ -156,11 +213,11 @@ router.put('/:id/transplant', async (req, res) => {
       current.container_id,
       current.cell_index,
       to_container_id,
-      to_cell_index ?? null,
+      finalCellIndex,
       notes || null,
     ]);
 
-    // Обновляем растение — статус НЕ меняем, только местоположение
+    // ===== Обновляем растение — статус НЕ меняем =====
     const updatedResult = await client.query(`
       UPDATE plants
       SET container_id = $1,
@@ -168,7 +225,7 @@ router.put('/:id/transplant', async (req, res) => {
           updated_at = NOW()
       WHERE id = $3
       RETURNING *
-    `, [to_container_id, to_cell_index ?? null, id]);
+    `, [to_container_id, finalCellIndex, id]);
 
     await client.query('COMMIT');
 
@@ -182,7 +239,6 @@ router.put('/:id/transplant', async (req, res) => {
   }
 });
 
-// PUT /api/plants/:id/status — сменить статус (собрано, погибло и т.д.)
 // PUT /api/plants/:id/status — сменить статус растения
 router.put('/:id/status', async (req, res) => {
   const client = await pool.connect();
@@ -201,7 +257,6 @@ router.put('/:id/status', async (req, res) => {
       });
     }
 
-    // Текущее состояние
     const currentResult = await client.query(
       'SELECT * FROM plants WHERE id = $1',
       [id]
@@ -214,7 +269,7 @@ router.put('/:id/status', async (req, res) => {
 
     const current = currentResult.rows[0];
 
-    // Если статус тот же — ничего не делаем
+    // Если статус не меняется — ничего не делаем
     if (current.status === status) {
       await client.query('ROLLBACK');
       return res.json(current);
