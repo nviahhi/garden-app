@@ -1156,3 +1156,115 @@ button {
   min-width: 52px;
   background: #f5f0e6;
 }
+
+/* ============================================
+   КАСТОМНЫЕ СКРОЛЛБАРЫ
+   ============================================ */
+
+/* Chrome, Edge, Safari */
+.sidebar-list::-webkit-scrollbar,
+.edit-panel::-webkit-scrollbar,
+.batch-plants-list::-webkit-scrollbar,
+.plant-history-list::-webkit-scrollbar,
+.pots-list::-webkit-scrollbar,
+.modal::-webkit-scrollbar,
+.zone-tabs::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.sidebar-list::-webkit-scrollbar-track,
+.edit-panel::-webkit-scrollbar-track,
+.batch-plants-list::-webkit-scrollbar-track,
+.plant-history-list::-webkit-scrollbar-track,
+.pots-list::-webkit-scrollbar-track,
+.modal::-webkit-scrollbar-track,
+.zone-tabs::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 4px;
+}
+
+.sidebar-list::-webkit-scrollbar-thumb,
+.edit-panel::-webkit-scrollbar-thumb,
+.batch-plants-list::-webkit-scrollbar-thumb,
+.plant-history-list::-webkit-scrollbar-thumb,
+.pots-list::-webkit-scrollbar-thumb,
+.modal::-webkit-scrollbar-thumb,
+.zone-tabs::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+
+.sidebar-list::-webkit-scrollbar-thumb:hover,
+.edit-panel::-webkit-scrollbar-thumb:hover,
+.batch-plants-list::-webkit-scrollbar-thumb:hover,
+.plant-history-list::-webkit-scrollbar-thumb:hover,
+.pots-list::-webkit-scrollbar-thumb:hover,
+.modal::-webkit-scrollbar-thumb:hover,
+.zone-tabs::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+/* Для тёмного сайдбара — светлый скроллбар */
+.sidebar .sidebar-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.sidebar .sidebar-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+/* Firefox */
+.sidebar-list,
+.edit-panel,
+.batch-plants-list,
+.plant-history-list,
+.pots-list,
+.modal,
+.zone-tabs {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
+}
+
+.sidebar .sidebar-list {
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+/* Кнопка редактирования зоны */
+/* Кнопка редактирования зоны */
+.zone-edit-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: transparent;
+  border: 1px solid #d0c8b8;
+  border-radius: 8px;
+  color: #6b5b45;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.zone-edit-btn:hover {
+  background: white;
+  border-color: #4a7c4a;
+  color: #2e4a2e;
+}
+
+.zone-edit-btn-icon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.zone-edit-btn-label {
+  font-size: 14px;
+}

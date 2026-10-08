@@ -38,8 +38,13 @@ export function ZoneSwitcher({ onSwitch, onCreate, onEdit }: ZoneSwitcherProps) 
       </div>
 
       {currentZone && (
-        <button className="btn-icon" onClick={onEdit} title="Редактировать зону">
-          ⚙️
+        <button
+          className="zone-edit-btn"
+          onClick={onEdit}
+          title="Редактировать текущую зону"
+        >
+          <span className="zone-edit-btn-icon">⚙</span>
+          <span className="zone-edit-btn-label">Настройки зоны</span>
         </button>
       )}
     </div>
