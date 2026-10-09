@@ -12,7 +12,6 @@ const TYPE_LABELS: Record<string, string> = {
   pot: 'Горшок',
   tray: 'Кассета',
   bed: 'Грядка',
-  greenhouse: 'Теплица',
 };
 
 // Единый масштаб: 1 см = 10 px

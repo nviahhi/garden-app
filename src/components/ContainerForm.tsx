@@ -17,12 +17,20 @@ interface ContainerFormProps {
   submitLabel: string;
 }
 
+// Типы контейнеров (без теплицы — она теперь отдельная зона)
 const TYPE_OPTIONS: { value: Container['type']; label: string }[] = [
   { value: 'pot', label: 'Горшок' },
   { value: 'tray', label: 'Кассета' },
   { value: 'bed', label: 'Грядка' },
-  { value: 'greenhouse', label: 'Теплица' },
 ];
+
+// Дефолтные размеры в см по типу контейнера
+const TYPE_DEFAULTS: Record<string, { width: number; height: number }> = {
+  pot: { width: 5, height: 5 },
+  tray: { width: 30, height: 20 },
+  bed: { width: 300, height: 100 },
+  greenhouse: { width: 300, height: 100 },
+};
 
 // Единый масштаб: 1 см = 10 px
 const PX_PER_CM = 10;
@@ -31,14 +39,29 @@ const pxToCm = (px: number) => Math.round(px / PX_PER_CM);
 const cmToPx = (cm: number) => Math.round(cm * PX_PER_CM);
 
 export function ContainerForm({ initial, onSubmit, onCancel, submitLabel }: ContainerFormProps) {
-  const [name, setName] = useState(initial?.name ?? '');
-  const [type, setType] = useState<Container['type']>(initial?.type ?? 'pot');
+  const initialType = initial?.type ?? 'pot';
+  const initialDefaults = TYPE_DEFAULTS[initialType] ?? TYPE_DEFAULTS.pot;
 
-  const [widthCm, setWidthCm] = useState(pxToCm(initial?.width ?? 80));
-  const [heightCm, setHeightCm] = useState(pxToCm(initial?.height ?? 40));
+  const [name, setName] = useState(initial?.name ?? '');
+  const [type, setType] = useState<Container['type']>(initialType);
+
+  const [widthCm, setWidthCm] = useState(
+    initial?.width ? pxToCm(initial.width) : initialDefaults.width
+  );
+  const [heightCm, setHeightCm] = useState(
+    initial?.height ? pxToCm(initial.height) : initialDefaults.height
+  );
 
   const [cols, setCols] = useState<string>(initial?.cols?.toString() ?? '');
   const [rows, setRows] = useState<string>(initial?.rows?.toString() ?? '');
+
+  // При смене типа подставляем дефолтные размеры
+  const handleTypeChange = (newType: Container['type']) => {
+    setType(newType);
+    const defaults = TYPE_DEFAULTS[newType] ?? TYPE_DEFAULTS.pot;
+    setWidthCm(defaults.width);
+    setHeightCm(defaults.height);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,7 +76,7 @@ export function ContainerForm({ initial, onSubmit, onCancel, submitLabel }: Cont
     });
   };
 
-  const showGrid = type === 'tray' || type === 'bed' || type === 'greenhouse';
+  const showGrid = type === 'tray' || type === 'bed';
 
   return (
     <form className="container-form" onSubmit={handleSubmit}>
@@ -70,7 +93,10 @@ export function ContainerForm({ initial, onSubmit, onCancel, submitLabel }: Cont
 
       <label className="field">
         <span>Тип</span>
-        <select value={type} onChange={(e) => setType(e.target.value as Container['type'])}>
+        <select
+          value={type}
+          onChange={(e) => handleTypeChange(e.target.value as Container['type'])}
+        >
           {TYPE_OPTIONS.map((opt) => (
             <option key={opt.value} value={opt.value}>{opt.label}</option>
           ))}
@@ -82,8 +108,8 @@ export function ContainerForm({ initial, onSubmit, onCancel, submitLabel }: Cont
           <span>Длина (см)</span>
           <input
             type="number"
-            min={2}
-            max={500}
+            min={1}
+            max={999}
             step={1}
             value={widthCm}
             onChange={(e) => setWidthCm(Number(e.target.value))}
@@ -94,8 +120,8 @@ export function ContainerForm({ initial, onSubmit, onCancel, submitLabel }: Cont
           <span>Ширина (см)</span>
           <input
             type="number"
-            min={2}
-            max={500}
+            min={1}
+            max={999}
             step={1}
             value={heightCm}
             onChange={(e) => setHeightCm(Number(e.target.value))}
