@@ -1,4 +1,6 @@
 import { useContainerStore } from '../store/useContainerStore';
+import { useZoneStore } from '../store/useZoneStore';
+import type { Container } from '../types';
 
 interface ContainerListProps {
   selectedId: number | null;
@@ -12,11 +14,8 @@ const TYPE_LABELS: Record<string, string> = {
   pot: 'Горшок',
   tray: 'Кассета',
   bed: 'Грядка',
+  greenhouse: 'Теплица',
 };
-
-// Единый масштаб: 1 см = 10 px
-const PX_PER_CM = 10;
-const pxToCm = (px: number) => Math.round(px / PX_PER_CM);
 
 export function ContainerList({
   selectedId,
@@ -27,6 +26,21 @@ export function ContainerList({
 }: ContainerListProps) {
   const allContainers = useContainerStore((s) => s.containers);
   const isLoading = useContainerStore((s) => s.isLoading);
+  const currentZone = useZoneStore((s) => s.currentZone);
+
+  const pxPerCm = currentZone?.px_per_cm ?? 10;
+
+  // Формат размера: грядки — в метрах, остальное — в см
+  const formatSize = (c: Container) => {
+    if (c.type === 'bed') {
+      const wM = (c.width / pxPerCm / 100).toFixed(1);
+      const hM = (c.height / pxPerCm / 100).toFixed(1);
+      return `${wM}×${hM} м`;
+    }
+    const w = Math.round(c.width / pxPerCm);
+    const h = Math.round(c.height / pxPerCm);
+    return `${w}×${h} см`;
+  };
 
   const containers = allContainers.filter((c) => c.zone_id === zoneId);
 
@@ -58,7 +72,7 @@ export function ContainerList({
           >
             <div className="list-item-name">{c.name}</div>
             <div className="list-item-meta">
-              {TYPE_LABELS[c.type] ?? c.type} · {pxToCm(c.width)}×{pxToCm(c.height)} см
+              {TYPE_LABELS[c.type] ?? c.type} · {formatSize(c)}
             </div>
           </button>
         ))}

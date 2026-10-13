@@ -12,6 +12,7 @@ import { ContainerPlants } from './ContainerPlants';
 import { ZoneBackground } from './ZoneBackground';
 
 const GRID_SIZE = 20;
+const MIN_CONTAINER_DISPLAY_PX = 40;
 
 interface GardenCanvasProps {
   selectedId: number | null;
@@ -46,6 +47,13 @@ function ContainerShape({
 
   const snapToGrid = (value: number) => Math.round(value / GRID_SIZE) * GRID_SIZE;
 
+  // Визуально увеличиваем слишком маленькие контейнеры
+  const displayContainer = {
+    ...container,
+    width: Math.max(container.width, MIN_CONTAINER_DISPLAY_PX),
+    height: Math.max(container.height, MIN_CONTAINER_DISPLAY_PX),
+  };
+
   const handleDragEnd = (e: KonvaEventObject<DragEvent>) => {
     const x = snapToGrid(e.target.x());
     const y = snapToGrid(e.target.y());
@@ -69,8 +77,8 @@ function ContainerShape({
       onMouseLeave={() => onHoverChange(false)}
     >
       <Rect
-        width={container.width}
-        height={container.height}
+        width={displayContainer.width}
+        height={displayContainer.height}
         fill="#e8f5e9"
         stroke={isSelected || isHighlighted ? '#2e7d32' : '#4a7c4a'}
         strokeWidth={isSelected || isHighlighted ? 3 : 2}
@@ -81,8 +89,8 @@ function ContainerShape({
 
       {hasCells && (
         <ContainerCells
-          width={container.width}
-          height={container.height}
+          width={displayContainer.width}
+          height={displayContainer.height}
           cols={container.cols!}
           rows={container.rows!}
         />
@@ -91,7 +99,7 @@ function ContainerShape({
       <Text
         x={8}
         y={8}
-        width={container.width - 16}
+        width={displayContainer.width - 16}
         text={container.name}
         fontSize={13}
         fill="#2e4a2e"
@@ -102,7 +110,7 @@ function ContainerShape({
       <Text
         x={8}
         y={36}
-        width={container.width - 16}
+        width={displayContainer.width - 16}
         text={container.type}
         fontSize={11}
         fill="#6b8e6b"
@@ -111,7 +119,7 @@ function ContainerShape({
       />
 
       <ContainerPlants
-        container={container}
+        container={displayContainer}
         plants={plants}
         batches={batches}
         onPlantClick={onPlantClick}
@@ -266,6 +274,7 @@ export function GardenCanvas({
   const batchesByContainer = useMemo(() => {
     const map = new Map<number, Batch[]>();
 
+    // 1. Партии с явным container_id (россыпь, ячейки)
     for (const batch of batches) {
       if (batch.container_id != null) {
         const list = map.get(batch.container_id) ?? [];
@@ -274,6 +283,7 @@ export function GardenCanvas({
       }
     }
 
+    // 2. Партии, распределённые по горшкам (container_id = null)
     for (const batch of batches) {
       if (batch.container_id != null) continue;
 
@@ -334,7 +344,7 @@ export function GardenCanvas({
         <button
           className="zoom-btn zoom-btn-fit"
           onClick={handleZoomFit}
-          title="По размеру экрана"
+          title="По размеру экрана (или двойной клик)"
         >
           {Math.round(zoom * 100)}%
         </button>

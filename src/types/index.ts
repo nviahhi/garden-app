@@ -1,9 +1,12 @@
+// ===== Контейнеры =====
+export type ContainerType = 'pot' | 'tray' | 'bed';
+
 export interface Container {
   id: number;
   user_id: number;
   zone_id: number | null;
   name: string;
-  type: 'tray' | 'pot' | 'bed' | 'greenhouse';
+  type: ContainerType;
   x: number;
   y: number;
   width: number;
@@ -14,6 +17,74 @@ export interface Container {
   updated_at: string;
 }
 
+// ===== Зоны =====
+export type ZoneType = 'shelf' | 'surface' | 'garden';
+
+export interface ZoneShelf {
+  id: number;
+  zone_id: number;
+  name: string;
+  y: number;
+  height: number;
+  color: string;
+  sort_order: number;
+}
+
+export interface Zone {
+  id: number;
+  user_id: number;
+  name: string;
+  type: ZoneType;
+  canvas_width: number;
+  canvas_height: number;
+  px_per_cm: number;
+  background_color: string;
+  grid_size: number;
+  sort_order: number;
+  created_at: string;
+  containers_count?: number;
+  shelves?: ZoneShelf[];
+  width_cm: number | null;
+  depth_cm: number | null;
+  shelf_count: number | null;
+}
+
+export const ZONE_TYPE_LABELS: Record<ZoneType, string> = {
+  shelf: 'Стеллаж',
+  surface: 'Поверхность',
+  garden: 'Огород',
+};
+
+export const ZONE_TYPE_EMOJI: Record<ZoneType, string> = {
+  shelf: '🗄️',
+  surface: '🪟',
+  garden: '🌾',
+};
+
+export const ZONE_TYPE_DESCRIPTIONS: Record<ZoneType, string> = {
+  shelf: 'Полки для горшков и кассет',
+  surface: 'Подоконник, стол, балкон',
+  garden: 'Грядки на открытом грунте',
+};
+
+export const ZONE_DEFAULTS: Record<ZoneType, {
+  widthCm: number;
+  depthCm: number;
+  pxPerCm: number;
+  bg: string;
+}> = {
+  shelf:   { widthCm: 80,  depthCm: 30,  pxPerCm: 10, bg: '#f5f0e6' },
+  surface: { widthCm: 120, depthCm: 40,  pxPerCm: 10, bg: '#faf6ef' },
+  garden:  { widthCm: 600, depthCm: 400, pxPerCm: 2,  bg: '#e8f0e0' },
+};
+
+export const ZONE_CONTAINER_TYPES: Record<ZoneType, ContainerType[]> = {
+  shelf:   ['pot', 'tray'],
+  surface: ['pot', 'tray'],
+  garden:  ['pot', 'tray', 'bed'],
+};
+
+// ===== Партии =====
 export interface Batch {
   id: number;
   species: string;
@@ -29,12 +100,8 @@ export interface Batch {
   container_type?: string | null;
 }
 
-export type PlantStatus =
-  | 'sown'
-  | 'growing'
-  | 'flowering'
-  | 'fruiting'
-  | 'done';
+// ===== Растения =====
+export type PlantStatus = 'sown' | 'growing' | 'flowering' | 'fruiting' | 'done';
 
 export interface Plant {
   id: number;
@@ -42,7 +109,7 @@ export interface Plant {
   container_id: number | null;
   cell_index: number | null;
   number: number;
-  display_number: number | null;   // ← новое
+  display_number: number | null;
   status: PlantStatus;
   notes: string | null;
   created_at: string;
@@ -58,7 +125,7 @@ export interface Plant {
 export interface PlantEvent {
   id: number;
   plant_id: number;
-  event_type: 'transplant' | 'note' | 'measure' | 'water' | 'status_change';  
+  event_type: 'transplant' | 'note' | 'measure' | 'water' | 'status_change';
   event_date: string;
   from_container_id: number | null;
   from_cell_index: number | null;
@@ -93,70 +160,4 @@ export const PLANT_STATUS_COLORS: Record<PlantStatus, string> = {
   flowering: '#f8bbd0',
   fruiting: '#ffcc80',
   done: '#90a4ae',
-};
-
-export type ZoneType =
-  | 'windowsill'
-  | 'shelf'
-  | 'balcony'
-  | 'greenhouse'
-  | 'garden';
-
-export interface ZoneShelf {
-  id: number;
-  zone_id: number;
-  name: string;
-  y: number;
-  height: number;
-  color: string;
-  sort_order: number;
-}
-
-export interface Zone {
-  id: number;
-  user_id: number;
-  name: string;
-  type: ZoneType;
-  canvas_width: number;
-  canvas_height: number;
-  px_per_cm: number;
-  background_color: string;
-  grid_size: number;
-  sort_order: number;
-  created_at: string;
-  containers_count?: number;
-  shelves?: ZoneShelf[];
-  shelf_width_cm: number | null;
-  shelf_depth_cm: number | null;
-  shelf_count: number | null;
-}
-
-export const ZONE_TYPE_LABELS: Record<ZoneType, string> = {
-  windowsill: 'Подоконник',
-  shelf: 'Стеллаж',
-  balcony: 'Балкон',
-  greenhouse: 'Теплица',
-  garden: 'Огород',
-};
-
-export const ZONE_TYPE_EMOJI: Record<ZoneType, string> = {
-  windowsill: '🪟',
-  shelf: '🗄️',
-  balcony: '🌇',
-  greenhouse: '🏡',
-  garden: '🌾',
-};
-
-// Дефолты для создания зоны
-export const ZONE_DEFAULTS: Record<ZoneType, {
-  width: number;
-  height: number;
-  pxPerCm: number;
-  bg: string;
-}> = {
-  windowsill: { width: 1200, height: 400, pxPerCm: 20, bg: '#faf6ef' },
-  shelf:      { width: 1000, height: 900, pxPerCm: 20, bg: '#f5f0e6' },
-  balcony:    { width: 1600, height: 800, pxPerCm: 10, bg: '#f0f5f0' },
-  greenhouse: { width: 1600, height: 1000, pxPerCm: 10, bg: '#eef5ee' },
-  garden:     { width: 2400, height: 1600, pxPerCm: 2, bg: '#e8f0e0' },
 };

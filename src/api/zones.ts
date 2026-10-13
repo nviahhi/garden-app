@@ -6,13 +6,10 @@ const api = axios.create({ baseURL: '/api' });
 export interface CreateZonePayload {
   name: string;
   type: ZoneType;
-  canvas_width?: number;
-  canvas_height?: number;
-  px_per_cm?: number;
   background_color?: string;
   grid_size?: number;
-  shelf_width_cm?: number;
-  shelf_depth_cm?: number;
+  width_cm: number;
+  depth_cm: number;
   shelf_count?: number;
 }
 

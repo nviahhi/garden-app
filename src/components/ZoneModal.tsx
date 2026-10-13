@@ -4,6 +4,7 @@ import { zonesApi } from '../api/zones';
 import {
   ZONE_TYPE_LABELS,
   ZONE_TYPE_EMOJI,
+  ZONE_TYPE_DESCRIPTIONS,
   ZONE_DEFAULTS,
   type ZoneType,
 } from '../types';
@@ -14,7 +15,7 @@ interface ZoneModalProps {
   onClose: () => void;
 }
 
-const ZONE_TYPES: ZoneType[] = ['windowsill', 'shelf', 'balcony', 'greenhouse', 'garden'];
+const ZONE_TYPES: ZoneType[] = ['shelf', 'surface', 'garden'];
 
 export function ZoneModal({ mode, zoneId, onClose }: ZoneModalProps) {
   const createZone = useZoneStore((s) => s.createZone);
@@ -22,11 +23,11 @@ export function ZoneModal({ mode, zoneId, onClose }: ZoneModalProps) {
   const removeZone = useZoneStore((s) => s.removeZone);
 
   const [name, setName] = useState('');
-  const [type, setType] = useState<ZoneType>('windowsill');
+  const [type, setType] = useState<ZoneType>('surface');
   const [loading, setLoading] = useState(false);
 
-  const [shelfWidthCm, setShelfWidthCm] = useState(80);
-  const [shelfDepthCm, setShelfDepthCm] = useState(30);
+  const [widthCm, setWidthCm] = useState(ZONE_DEFAULTS.surface.widthCm);
+  const [depthCm, setDepthCm] = useState(ZONE_DEFAULTS.surface.depthCm);
   const [shelfCount, setShelfCount] = useState(4);
 
   useEffect(() => {
@@ -34,12 +35,20 @@ export function ZoneModal({ mode, zoneId, onClose }: ZoneModalProps) {
       zonesApi.getOne(zoneId).then((data) => {
         setName(data.name);
         setType(data.type);
-        if (data.shelf_width_cm) setShelfWidthCm(data.shelf_width_cm);
-        if (data.shelf_depth_cm) setShelfDepthCm(data.shelf_depth_cm);
+        if (data.width_cm) setWidthCm(data.width_cm);
+        if (data.depth_cm) setDepthCm(data.depth_cm);
         if (data.shelf_count) setShelfCount(data.shelf_count);
       });
     }
   }, [mode, zoneId]);
+
+  // При смене типа — подставляем дефолтные размеры
+  const handleTypeChange = (newType: ZoneType) => {
+    setType(newType);
+    const d = ZONE_DEFAULTS[newType];
+    setWidthCm(d.widthCm);
+    setDepthCm(d.depthCm);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,38 +57,22 @@ export function ZoneModal({ mode, zoneId, onClose }: ZoneModalProps) {
     setLoading(true);
     const defaults = ZONE_DEFAULTS[type];
 
-    let payload: Parameters<typeof createZone>[0] = {
+    const payload = {
       name: name.trim(),
       type,
+      background_color: defaults.bg,
+      grid_size: 20,
+      width_cm: widthCm,
+      depth_cm: depthCm,
+      shelf_count: type === 'shelf' ? shelfCount : undefined,
     };
-
-    if (type === 'shelf') {
-      payload = {
-        ...payload,
-        background_color: defaults.bg,
-        grid_size: 20,
-        shelf_width_cm: shelfWidthCm,
-        shelf_depth_cm: shelfDepthCm,
-        shelf_count: shelfCount,
-      };
-      // canvas_width и canvas_height вычисляются на backend
-    } else {
-      payload = {
-        ...payload,
-        canvas_width: defaults.width,
-        canvas_height: defaults.height,
-        px_per_cm: defaults.pxPerCm,
-        background_color: defaults.bg,
-        grid_size: 20,
-      };
-    }
 
     let ok = false;
     if (mode === 'create') {
-      const created = await createZone(payload);
+      const created = await createZone(payload as Parameters<typeof createZone>[0]);
       ok = !!created;
     } else if (zoneId) {
-      ok = await updateZone(zoneId, payload);
+      ok = await updateZone(zoneId, payload as Parameters<typeof updateZone>[1]);
     }
 
     setLoading(false);
@@ -98,7 +91,7 @@ export function ZoneModal({ mode, zoneId, onClose }: ZoneModalProps) {
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal modal-wide" onClick={(e) => e.stopPropagation()}>
         <div className="panel-header">
-          <h3>{mode === 'create' ? 'Новая зона' : 'Редактировать зону'}</h3>
+          <h3>{mode === 'create' ? 'Новая зона' : 'Настройки зоны'}</h3>
           <button className="btn-icon" onClick={onClose} aria-label="Закрыть">×</button>
         </div>
 
@@ -109,7 +102,7 @@ export function ZoneModal({ mode, zoneId, onClose }: ZoneModalProps) {
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Например, Стеллаж у окна"
+              placeholder="Например, Подоконник на кухне"
               autoFocus
             />
           </label>
@@ -122,73 +115,141 @@ export function ZoneModal({ mode, zoneId, onClose }: ZoneModalProps) {
                   key={t}
                   type="button"
                   className={`zone-type-btn ${type === t ? 'is-active' : ''}`}
-                  onClick={() => setType(t)}
+                  onClick={() => handleTypeChange(t)}
                 >
                   <span className="zone-type-emoji">{ZONE_TYPE_EMOJI[t]}</span>
                   <span className="zone-type-label">{ZONE_TYPE_LABELS[t]}</span>
+                  <span className="zone-type-desc">{ZONE_TYPE_DESCRIPTIONS[t]}</span>
                 </button>
               ))}
             </div>
           </div>
 
-          {type === 'shelf' && (
-            <div className="shelf-config">
-              <div className="shelf-config-title">Параметры стеллажа</div>
+          <div className="zone-config">
+            <div className="zone-config-title">
+              {type === 'shelf' && 'Параметры стеллажа'}
+              {type === 'surface' && 'Размеры поверхности'}
+              {type === 'garden' && 'Размеры огорода'}
+            </div>
 
-              <div className="shelf-fields">
+            {type === 'shelf' ? (
+              <>
+                <div className="zone-fields">
+                  <label className="field field-shelf">
+                    <span>Ширина полки (см)</span>
+                    <input
+                      type="number"
+                      min={20}
+                      max={500}
+                      value={widthCm}
+                      onChange={(e) => setWidthCm(Number(e.target.value))}
+                    />
+                  </label>
+                  <label className="field field-shelf">
+                    <span>Глубина полки (см)</span>
+                    <input
+                      type="number"
+                      min={10}
+                      max={200}
+                      value={depthCm}
+                      onChange={(e) => setDepthCm(Number(e.target.value))}
+                    />
+                  </label>
+                  <label className="field field-shelf">
+                    <span>Полок</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={10}
+                      value={shelfCount}
+                      onChange={(e) => setShelfCount(Number(e.target.value))}
+                    />
+                  </label>
+                </div>
+
+                <div className="shelf-preview">
+                  <div className="shelf-preview-label">
+                    {widthCm}×{depthCm} см · {shelfCount} полок
+                  </div>
+                  <div className="shelf-preview-canvas">
+                    {Array.from({ length: shelfCount }).map((_, i) => (
+                      <div key={i} className="shelf-preview-row">
+                        <span className="shelf-preview-name">
+                          Полка {shelfCount - i}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            ) : type === 'surface' ? (
+              <div className="zone-fields zone-fields-2">
                 <label className="field field-shelf">
                   <span>Ширина (см)</span>
                   <input
                     type="number"
-                    min={20}
-                    max={500}
-                    step={1}
-                    value={shelfWidthCm}
-                    onChange={(e) => setShelfWidthCm(Number(e.target.value))}
+                    min={10}
+                    max={2000}
+                    value={widthCm}
+                    onChange={(e) => setWidthCm(Number(e.target.value))}
                   />
                 </label>
-
                 <label className="field field-shelf">
                   <span>Глубина (см)</span>
                   <input
                     type="number"
                     min={10}
-                    max={200}
-                    step={1}
-                    value={shelfDepthCm}
-                    onChange={(e) => setShelfDepthCm(Number(e.target.value))}
-                  />
-                </label>
-
-                <label className="field field-shelf">
-                  <span>Полок</span>
-                  <input
-                    type="number"
-                    min={1}
-                    max={10}
-                    step={1}
-                    value={shelfCount}
-                    onChange={(e) => setShelfCount(Number(e.target.value))}
+                    max={2000}
+                    value={depthCm}
+                    onChange={(e) => setDepthCm(Number(e.target.value))}
                   />
                 </label>
               </div>
+            ) : (
+              <>
+                <div className="zone-fields zone-fields-2">
+                  <label className="field field-shelf">
+                    <span>Ширина (м)</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={100}
+                      step={0.5}
+                      value={+(widthCm / 100).toFixed(2)}
+                      onChange={(e) => {
+                        const meters = Number(e.target.value);
+                        setWidthCm(Math.max(100, Math.round(meters * 100)));
+                      }}
+                    />
+                  </label>
+                  <label className="field field-shelf">
+                    <span>Длина (м)</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={100}
+                      step={0.5}
+                      value={+(depthCm / 100).toFixed(2)}
+                      onChange={(e) => {
+                        const meters = Number(e.target.value);
+                        setDepthCm(Math.max(100, Math.round(meters * 100)));
+                      }}
+                    />
+                  </label>
+                </div>
 
-              <div className="shelf-preview">
-                <div className="shelf-preview-label">
-                  Превью · {shelfWidthCm}×{shelfDepthCm} см · {shelfCount} полок
+                <div className="zone-config-hint">
+                  {+(widthCm / 100).toFixed(2)} × {+(depthCm / 100).toFixed(2)} м
                 </div>
-                <div className="shelf-preview-canvas">
-                  {Array.from({ length: shelfCount }).map((_, i) => (
-                    <div key={i} className="shelf-preview-row">
-                      <span className="shelf-preview-name">
-                        Полка {shelfCount - i}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              </>
+            )}
+
+            <div className="zone-config-hint">
+              {type === 'shelf' && 'Полки рисуются сверху вниз. Каждая полка — отдельная горизонтальная полоса.'}
+              {type === 'surface' && 'Плоская поверхность: подоконник, стол, балкон.'}
+              {type === 'garden' && 'Масштаб меньше — влезают большие грядки. Доступны грядки как тип контейнера.'}
             </div>
-          )}
+          </div>
 
           <div className="form-actions">
             <button
