@@ -68,11 +68,15 @@ router.get('/:id', async (req, res) => {
 
     const eventsResult = await pool.query(`
       SELECT e.*,
-             fc.name AS from_container_name,
-             tc.name AS to_container_name
+            fc.name AS from_container_name,
+            tc.name AS to_container_name,
+            fz.name AS from_zone_name,
+            tz.name AS to_zone_name
       FROM plant_events e
       LEFT JOIN containers fc ON fc.id = e.from_container_id
       LEFT JOIN containers tc ON tc.id = e.to_container_id
+      LEFT JOIN zones fz ON fz.id = fc.zone_id
+      LEFT JOIN zones tz ON tz.id = tc.zone_id
       WHERE e.plant_id = $1
       ORDER BY e.event_date DESC, e.id DESC
     `, [id]);

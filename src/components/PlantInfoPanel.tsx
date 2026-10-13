@@ -178,7 +178,21 @@ export function PlantInfoPanel({ plant, onClose, onTransplant }: PlantInfoPanelP
 
                 {e.event_type === 'transplant' && (
                   <div className="plant-event-detail">
-                    {e.from_container_name ?? '?'} → {e.to_container_name ?? '?'}
+                    <span className="plant-event-place">
+                      {e.from_zone_name && (
+                        <span className="plant-event-zone">{e.from_zone_name}</span>
+                      )}
+                      {e.from_container_name ?? '?'}
+                      {e.from_cell_index != null && ` · ячейка ${e.from_cell_index + 1}`}
+                    </span>
+                    <span className="plant-event-arrow">→</span>
+                    <span className="plant-event-place">
+                      {e.to_zone_name && (
+                        <span className="plant-event-zone">{e.to_zone_name}</span>
+                      )}
+                      {e.to_container_name ?? '?'}
+                      {e.to_cell_index != null && ` · ячейка ${e.to_cell_index + 1}`}
+                    </span>
                   </div>
                 )}
 

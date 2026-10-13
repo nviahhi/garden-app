@@ -136,6 +136,8 @@ export interface PlantEvent {
   notes: string | null;
   from_container_name?: string | null;
   to_container_name?: string | null;
+  from_zone_name?: string | null;
+  to_zone_name?: string | null; 
 }
 
 export const PLANT_STATUS_LABELS: Record<PlantStatus, string> = {
