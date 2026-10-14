@@ -9,6 +9,10 @@ const BADGE_HEIGHT = 22;
 const BADGE_GAP = 4;
 const BADGE_PADDING = 8;
 
+// Максимальные радиусы маркеров (в px)
+const MAX_RADIUS_GRID = 10;   // кассета с сеткой
+const MAX_RADIUS_FREE = 12;   // горшок / плошка без сетки
+
 interface ContainerPlantsProps {
   container: Container;
   plants: Plant[];
@@ -33,88 +37,150 @@ export function ContainerPlants({
 
   if (!hasPlants && !hasBatches) return null;
 
-  // ===== Режим 1: сетка + растения с cell_index =====
-  if (hasGrid && hasPlants) {
+  // ===== Какие партии показываем БЕЙДЖЕМ =====
+  // Партия показывается бейджем, если у неё НЕТ растений с конкретной ячейкой.
+  // Если растения по ячейкам — рисуем их маркерами на сетке.
+  const badgeBatchIds = new Set<number>();
+  for (const batch of batches) {
+    const batchPlants = plants.filter((p) => p.batch_id === batch.id);
+    const hasCellPlants = batchPlants.some((p) => p.cell_index !== null);
+    if (!hasCellPlants) badgeBatchIds.add(batch.id);
+  }
+
+  // ===== Растения, которые рисуем маркерами =====
+  // 1. Любое растение с cell_index != null (своё по ячейкам или гость)
+  // 2. Гости (партии нет в badgeBatchIds) даже без ячейки
+  const markerPlants = plants.filter((p) => {
+    if (p.cell_index !== null) return true;
+    return !badgeBatchIds.has(p.batch_id);
+  });
+
+  // ===== Режим 1: кассета с сеткой =====
+  if (hasGrid) {
     const cols = container.cols!;
     const rows = container.rows!;
+    const totalCells = cols * rows;
 
     const gridWidth = container.width - CELL_PADDING * 2;
     const gridHeight = container.height - HEADER_HEIGHT - CELL_PADDING;
     const cellWidth = gridWidth / cols;
     const cellHeight = gridHeight / rows;
+    const radius = Math.max(
+      3,
+      Math.min(MAX_RADIUS_GRID, Math.min(cellWidth, cellHeight) / 2 - 9)
+    );
 
-    const plantsByCell = plants.filter((p) => p.cell_index !== null);
+    // Растения с явной ячейкой
+    const plantsByCell = markerPlants.filter((p) => p.cell_index !== null);
+    // Растения без ячейки (гости)
+    const plantsWithoutCell = markerPlants.filter((p) => p.cell_index === null);
 
-    if (plantsByCell.length > 0) {
-      return (
-        <Group>
-          {plantsByCell.map((plant) => {
-            const cellIndex = plant.cell_index!;
-            const col = cellIndex % cols;
-            const row = Math.floor(cellIndex / cols);
-            if (row >= rows) return null;
+    // Занятые ячейки
+    const occupied = new Set(
+      plantsByCell.map((p) => p.cell_index!).filter((i) => i < totalCells)
+    );
 
-            const cx = CELL_PADDING + col * cellWidth + cellWidth / 2;
-            const cy = HEADER_HEIGHT + row * cellHeight + cellHeight / 2;
-            const radius = Math.max(3, Math.min(cellWidth, cellHeight) / 2 - 9);
-
-            return (
-              <PlantMarker
-                key={plant.id}
-                plant={plant}
-                x={cx}
-                y={cy}
-                radius={radius}
-                onClick={() => onPlantClick?.(plant)}
-              />
-            );
-          })}
-        </Group>
-      );
+    // Свободные ячейки для растений без cell_index
+    const freeCells: number[] = [];
+    for (let i = 0; i < totalCells && freeCells.length < plantsWithoutCell.length; i++) {
+      if (!occupied.has(i)) freeCells.push(i);
     }
-  }
 
-  // ===== Режим 1.5: без сетки, 1–4 растения — маркеры в ряд + бейджи =====
-  const nonGridPlants = plants.filter((p) => p.cell_index === null);
+    const renderAt = (plant: Plant, cellIndex: number) => {
+      const col = cellIndex % cols;
+      const row = Math.floor(cellIndex / cols);
+      const cx = CELL_PADDING + col * cellWidth + cellWidth / 2;
+      const cy = HEADER_HEIGHT + row * cellHeight + cellHeight / 2;
 
-  if (!hasGrid && nonGridPlants.length > 0 && nonGridPlants.length <= 4) {
-    const count = nonGridPlants.length;
-    const RADIUS = 14;
-    const GAP = RADIUS * 2 + 4;
-    const startX = container.width / 2 - ((count - 1) * GAP) / 2;
-    const cy = container.height / 2 + 6;
+      return (
+        <PlantMarker
+          key={plant.id}
+          plant={plant}
+          x={cx}
+          y={cy}
+          radius={radius}
+          onClick={() => onPlantClick?.(plant)}
+        />
+      );
+    };
 
-    const badgeItems = buildBadgeItems(plants, batches, onBatchClick);
+    const badgeItems = buildBadgeItems(
+      plants,
+      batches.filter((b) => badgeBatchIds.has(b.id)),
+      onBatchClick
+    );
 
     return (
       <Group>
-        {/* Маркеры растений */}
-        {nonGridPlants.map((plant, i) => (
-          <PlantMarker
-            key={plant.id}
-            plant={plant}
-            x={startX + i * GAP}
-            y={cy}
-            radius={RADIUS}
-            onClick={() => onPlantClick?.(plant)}
-          />
-        ))}
+        {/* Растения по ячейкам */}
+        {plantsByCell.map((p) =>
+          p.cell_index! < totalCells ? renderAt(p, p.cell_index!) : null
+        )}
 
-        {/* Бейджи партий */}
-        {renderBadges(container, badgeItems)}
+        {/* Растения без ячейки — в свободные */}
+        {plantsWithoutCell.map((p, i) =>
+          i < freeCells.length ? renderAt(p, freeCells[i]) : null
+        )}
+
+        {/* Бейджи россыпи */}
+        {badgeItems.length > 0 && renderBadges(container, badgeItems)}
       </Group>
     );
   }
 
-  // ===== Режим 2: бейджи по партиям =====
-  const items = buildBadgeItems(plants, batches, onBatchClick);
+  // ===== Режим 2: без сетки =====
+  const badgeItems = buildBadgeItems(
+    plants,
+    batches.filter((b) => badgeBatchIds.has(b.id)),
+    onBatchClick
+  );
 
-  if (items.length === 0) return null;
+  const markerCount = markerPlants.length;
 
-  return renderBadges(container, items);
+  return (
+    <Group>
+      {markerCount > 0 && (
+        <Group>
+          {(() => {
+            const cols = Math.min(6, Math.max(1, markerCount));
+            const rows = Math.ceil(markerCount / cols);
+
+            const gridWidth = container.width - CELL_PADDING * 2;
+            const gridHeight = container.height - HEADER_HEIGHT - CELL_PADDING;
+            const cellW = gridWidth / cols;
+            const cellH = gridHeight / rows;
+            const radius = Math.max(
+              5,
+              Math.min(MAX_RADIUS_FREE, Math.min(cellW, cellH) / 2 - 4)
+            );
+
+            return markerPlants.map((plant, i) => {
+              const col = i % cols;
+              const row = Math.floor(i / cols);
+              const cx = CELL_PADDING + col * cellW + cellW / 2;
+              const cy = HEADER_HEIGHT + row * cellH + cellH / 2;
+
+              return (
+                <PlantMarker
+                  key={plant.id}
+                  plant={plant}
+                  x={cx}
+                  y={cy}
+                  radius={radius}
+                  onClick={() => onPlantClick?.(plant)}
+                />
+              );
+            });
+          })()}
+        </Group>
+      )}
+
+      {badgeItems.length > 0 && renderBadges(container, badgeItems)}
+    </Group>
+  );
 }
 
-// Общая логика формирования бейджей
+// Формирование бейджей по партиям
 function buildBadgeItems(
   plants: Plant[],
   batches: Batch[],
@@ -132,7 +198,6 @@ function buildBadgeItems(
       };
     }
 
-    // Партия распределена по горшкам (container_id = null) — локальный счёт
     const isDistributed = batch.container_id === null;
     const total = isDistributed ? localPlants.length : batch.seeds_count;
 

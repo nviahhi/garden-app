@@ -204,7 +204,7 @@ export function BatchCreateModal({ onClose, presetContainerId }: BatchCreateModa
                 <option value="">— не выбран —</option>
                 {dropdownContainers.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.name} ({c.type})
+                    {c.name}
                     {c.cols && c.rows ? ` — ${c.cols}×${c.rows}` : ''}
                   </option>
                 ))}
@@ -225,7 +225,6 @@ export function BatchCreateModal({ onClose, presetContainerId }: BatchCreateModa
                       onChange={() => togglePot(c.id)}
                     />
                     <span>{c.name}</span>
-                    <span className="pot-type">{c.type}</span>
                   </label>
                 ))}
               </div>

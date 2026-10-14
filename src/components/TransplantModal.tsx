@@ -11,11 +11,18 @@ interface TransplantModalProps {
 
 export function TransplantModal({ plant, onClose }: TransplantModalProps) {
   const containers = useContainerStore((s) => s.containers);
-  const zones = useZoneStore((s) => s.zones);
   const transplantPlant = useBatchStore((s) => s.transplantPlant);
+  const zones = useZoneStore((s) => s.zones);
+  const currentZone = useZoneStore((s) => s.currentZone);
 
   // Исключаем текущий контейнер
-  const availableContainers = containers.filter((c) => c.id !== plant.container_id);
+  const availableContainers = containers
+    .filter((c) => c.id !== plant.container_id)
+    .sort((a, b) => {
+      const aInCurrent = a.zone_id === currentZone?.id ? 0 : 1;
+      const bInCurrent = b.zone_id === currentZone?.id ? 0 : 1;
+      return aInCurrent - bInCurrent;
+    });
 
   const [targetId, setTargetId] = useState<number | ''>('');
   const [cellIndex, setCellIndex] = useState<number | ''>('');
@@ -46,7 +53,7 @@ export function TransplantModal({ plant, onClose }: TransplantModalProps) {
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="panel-header">
-          <h3>Пересадка растения #{plant.number}</h3>
+          <h3>Пересадка растения #{plant.display_number ?? plant.number}</h3>
           <button className="btn-icon" onClick={onClose} aria-label="Закрыть">×</button>
         </div>
 
@@ -65,29 +72,43 @@ export function TransplantModal({ plant, onClose }: TransplantModalProps) {
           <label className="field">
             <span>Куда пересаживаем? *</span>
             <select
-            value={targetId}
-            onChange={(e) => {
-              setTargetId(e.target.value ? Number(e.target.value) : '');
-              setCellIndex('');
-            }}
-            autoFocus
-          >
+              value={targetId}
+              onChange={(e) => {
+                setTargetId(e.target.value ? Number(e.target.value) : '');
+                setCellIndex('');
+              }}
+              autoFocus
+            >
               <option value="">— выберите контейнер —</option>
-              {zones.map((zone) => {
-                const zoneContainers = availableContainers.filter((c) => c.zone_id === zone.id);
-                if (zoneContainers.length === 0) return null;
+              {(() => {
+                // Сортируем зоны: текущая — первая
+                const sortedZones = [...zones].sort((a, b) => {
+                  const aIsCurrent = a.id === currentZone?.id ? 0 : 1;
+                  const bIsCurrent = b.id === currentZone?.id ? 0 : 1;
+                  return aIsCurrent - bIsCurrent;
+                });
 
-                return (
-                  <optgroup key={zone.id} label={zone.name}>
-                    {zoneContainers.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name} ({c.type})
-                        {c.cols && c.rows ? ` — ${c.cols}×${c.rows}` : ''}
-                      </option>
-                    ))}
-                  </optgroup>
-                );
-              })}
+                return sortedZones.map((zone) => {
+                  const zoneContainers = availableContainers.filter(
+                    (c) => c.zone_id === zone.id
+                  );
+                  if (zoneContainers.length === 0) return null;
+
+                  const isCurrent = zone.id === currentZone?.id;
+                  const label = isCurrent ? `${zone.name} (текущая)` : zone.name;
+
+                  return (
+                    <optgroup key={zone.id} label={label}>
+                      {zoneContainers.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                          {c.cols && c.rows ? ` — ${c.cols}×${c.rows}` : ''}
+                        </option>
+                      ))}
+                    </optgroup>
+                  );
+                });
+              })()}
             </select>
           </label>
 
@@ -105,7 +126,6 @@ export function TransplantModal({ plant, onClose }: TransplantModalProps) {
                     setCellIndex('');
                   } else {
                     const num = Number(val);
-                    // Сохраняем как 0-индекс внутри (1 → 0, 2 → 1...)
                     setCellIndex(Math.max(0, Math.min(totalCells - 1, num - 1)));
                   }
                 }}
@@ -113,7 +133,7 @@ export function TransplantModal({ plant, onClose }: TransplantModalProps) {
                 className="field-narrow"
               />
               <span className="field-hint">
-                 Необязательно. Если не указать — займёт первую свободную.
+                Необязательно. Если не указать — займёт первую свободную.
               </span>
             </label>
           )}

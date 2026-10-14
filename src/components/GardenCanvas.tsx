@@ -107,16 +107,6 @@ function ContainerShape({
         wrap="word"
         ellipsis
       />
-      <Text
-        x={8}
-        y={36}
-        width={displayContainer.width - 16}
-        text={container.type}
-        fontSize={11}
-        fill="#6b8e6b"
-        wrap="word"
-        ellipsis
-      />
 
       <ContainerPlants
         container={displayContainer}
