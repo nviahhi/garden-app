@@ -10,8 +10,8 @@ const BADGE_GAP = 4;
 const BADGE_PADDING = 8;
 
 // Максимальные радиусы маркеров (в px)
-const MAX_RADIUS_GRID = 10;   // кассета с сеткой
-const MAX_RADIUS_FREE = 12;   // горшок / плошка без сетки
+const MAX_RADIUS_GRID = 18;   // кассета с сеткой
+const MAX_RADIUS_FREE = 24;   // горшок / плошка без сетки
 
 interface ContainerPlantsProps {
   container: Container;
@@ -145,20 +145,28 @@ export function ContainerPlants({
             const cols = Math.min(6, Math.max(1, markerCount));
             const rows = Math.ceil(markerCount / cols);
 
+            const smallContainer = container.height < 80;
+            const topOffset = smallContainer ? 22 : HEADER_HEIGHT;
             const gridWidth = container.width - CELL_PADDING * 2;
-            const gridHeight = container.height - HEADER_HEIGHT - CELL_PADDING;
+            const gridHeight = smallContainer
+              ? container.height - topOffset
+              : container.height - HEADER_HEIGHT - CELL_PADDING;
             const cellW = gridWidth / cols;
             const cellH = gridHeight / rows;
+
+            // Кап радиуса: для мелких контейнеров меньше, чтобы не закрывать название
+            const maxR = smallContainer ? 10 : MAX_RADIUS_FREE;
+
             const radius = Math.max(
-              5,
-              Math.min(MAX_RADIUS_FREE, Math.min(cellW, cellH) / 2 - 4)
+              4,
+              Math.min(maxR, Math.min(cellW, cellH) / 2 - 1)
             );
 
             return markerPlants.map((plant, i) => {
               const col = i % cols;
               const row = Math.floor(i / cols);
               const cx = CELL_PADDING + col * cellW + cellW / 2;
-              const cy = HEADER_HEIGHT + row * cellH + cellH / 2;
+              const cy = topOffset + row * cellH + cellH / 2;   
 
               return (
                 <PlantMarker

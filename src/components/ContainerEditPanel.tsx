@@ -7,12 +7,23 @@ interface ContainerEditPanelProps {
   onClose: () => void;
 }
 
+const NEW_POSITION_X = 20;
+const NEW_POSITION_Y = 20;
+
 export function ContainerEditPanel({ container, onClose }: ContainerEditPanelProps) {
   const updateContainer = useContainerStore((s) => s.updateContainer);
   const removeContainer = useContainerStore((s) => s.removeContainer);
 
   const handleSubmit = async (data: ContainerFormData) => {
-    await updateContainer(container.id, data);
+    const updates: Partial<Container> = { ...data };
+
+    // При смене зоны — в левый верхний угол новой зоны
+    if (data.zone_id !== container.zone_id) {
+      updates.x = NEW_POSITION_X;
+      updates.y = NEW_POSITION_Y;
+    }
+
+    await updateContainer(container.id, updates);
     onClose();
   };
 
@@ -31,7 +42,7 @@ export function ContainerEditPanel({ container, onClose }: ContainerEditPanelPro
       </div>
 
       <ContainerForm
-	  	key={container.id}
+        key={container.id}
         initial={container}
         onSubmit={handleSubmit}
         onCancel={onClose}

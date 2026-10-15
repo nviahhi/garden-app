@@ -12,7 +12,7 @@ export function ContainerCreateModal({ zoneId, onClose }: ContainerCreateModalPr
   const handleSubmit = async (data: ContainerFormData) => {
     await addContainer({
       ...data,
-      zone_id: zoneId,
+      zone_id: data.zone_id ?? zoneId,
       x: 100,
       y: 100,
     });
