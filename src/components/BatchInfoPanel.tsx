@@ -33,7 +33,7 @@ export function BatchInfoPanel({
   const plantsCount = batchPlants.length;
   const sownCount = batchPlants.filter((p) => p.status === 'sown').length;
   const germinatedCount = batchPlants.filter((p) => p.status !== 'sown').length;
-  
+
   const canCreatePlants = plantsCount === 0 && batch.seeds_count > 0 && batch.container_id != null;
   const canMarkGerminated = sownCount > 0;
 
@@ -125,7 +125,19 @@ export function BatchInfoPanel({
           <h4>Растения ({batchPlants.length})</h4>
           <div className="batch-plants-list">
             {batchPlants.map((p) => (
-              <div key={p.id} className="batch-plant-item">
+              <div
+                key={p.id}
+                className="batch-plant-item"
+                draggable={p.status !== 'done'}
+                onDragStart={(e) => {
+                  e.dataTransfer.setData('plantId', String(p.id));
+                  e.dataTransfer.effectAllowed = 'move';
+                  e.currentTarget.classList.add('is-dragging');
+                }}
+                onDragEnd={(e) => {
+                  e.currentTarget.classList.remove('is-dragging');
+                }}
+              >
                 <div className="batch-plant-info">
                   <span className="batch-plant-num">
                     #{p.display_number ?? p.number}

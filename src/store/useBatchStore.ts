@@ -121,19 +121,15 @@ export const useBatchStore = create<BatchState>((set, get) => ({
 
   transplantPlant: async (id, to_container_id, to_cell_index, notes) => {
     try {
-      const updated = await plantsApi.transplant(id, {
+      await plantsApi.transplant(id, {
         to_container_id,
         to_cell_index,
         notes,
       });
-      // Обновляем растение локально
-      set({
-        plants: get().plants.map((p) =>
-          p.id === id ? { ...p, ...updated } : p
-        ),
-      });
-      // Перезагружаем, чтобы подтянуть container_name и события
+      // Перезагружаем полностью — это гарантирует актуальные container_name
+      // и корректный подсчёт растений в контейнерах.
       await get().loadPlants();
+      await get().loadBatches();
       return true;
     } catch (err) {
       console.error('Ошибка пересадки:', err);

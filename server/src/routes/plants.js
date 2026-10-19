@@ -3,7 +3,6 @@ const router = express.Router();
 const pool = require('../db');
 
 // GET /api/plants — список растений с фильтрами
-// Query: ?container_id=1&batch_id=2&status=growing
 router.get('/', async (req, res) => {
   try {
     const { container_id, batch_id, status } = req.query;
@@ -68,10 +67,10 @@ router.get('/:id', async (req, res) => {
 
     const eventsResult = await pool.query(`
       SELECT e.*,
-            fc.name AS from_container_name,
-            tc.name AS to_container_name,
-            fz.name AS from_zone_name,
-            tz.name AS to_zone_name
+             fc.name AS from_container_name,
+             tc.name AS to_container_name,
+             fz.name AS from_zone_name,
+             tz.name AS to_zone_name
       FROM plant_events e
       LEFT JOIN containers fc ON fc.id = e.from_container_id
       LEFT JOIN containers tc ON tc.id = e.to_container_id
@@ -121,7 +120,6 @@ router.post('/', async (req, res) => {
 });
 
 // PUT /api/plants/:id/transplant — пересадка растения
-// Body: { to_container_id, to_cell_index?, notes? }
 router.put('/:id/transplant', async (req, res) => {
   const client = await pool.connect();
 
@@ -136,7 +134,7 @@ router.put('/:id/transplant', async (req, res) => {
       return res.status(400).json({ error: 'Поле to_container_id обязательно' });
     }
 
-    // Получаем текущее состояние растения
+    // Текущее состояние растения
     const currentResult = await client.query(
       'SELECT * FROM plants WHERE id = $1',
       [id]
@@ -152,7 +150,6 @@ router.put('/:id/transplant', async (req, res) => {
     // ===== Определяем финальный cell_index =====
     let finalCellIndex = to_cell_index ?? null;
 
-    // Если целевой контейнер с сеткой и ячейка не указана — ищем первую свободную
     if (finalCellIndex == null) {
       const targetContainer = await client.query(
         'SELECT * FROM containers WHERE id = $1',
@@ -165,7 +162,6 @@ router.put('/:id/transplant', async (req, res) => {
       if (hasGrid) {
         const totalCells = container.cols * container.rows;
 
-        // Занятые ячейки (кроме текущего растения)
         const occupied = await client.query(`
           SELECT cell_index FROM plants
           WHERE container_id = $1 AND cell_index IS NOT NULL AND id != $2
@@ -173,7 +169,6 @@ router.put('/:id/transplant', async (req, res) => {
 
         const occupiedSet = new Set(occupied.rows.map((r) => r.cell_index));
 
-        // Первая свободная ячейка
         let freeCell = null;
         for (let i = 0; i < totalCells; i++) {
           if (!occupiedSet.has(i)) {
@@ -192,7 +187,7 @@ router.put('/:id/transplant', async (req, res) => {
         finalCellIndex = freeCell;
       }
     } else {
-      // Пользователь указал ячейку явно — проверяем, что она свободна
+      // Пользователь указал ячейку явно — проверяем занятость
       const conflict = await client.query(`
         SELECT id FROM plants
         WHERE container_id = $1 AND cell_index = $2 AND id != $3
@@ -221,19 +216,29 @@ router.put('/:id/transplant', async (req, res) => {
       notes || null,
     ]);
 
-    // ===== Обновляем растение — статус НЕ меняем =====
-    const updatedResult = await client.query(`
+    // ===== Обновляем растение =====
+    await client.query(`
       UPDATE plants
       SET container_id = $1,
           cell_index = $2,
           updated_at = NOW()
       WHERE id = $3
-      RETURNING *
     `, [to_container_id, finalCellIndex, id]);
+
+    // Читаем с JOIN, чтобы вернуть актуальные container_name / container_type
+    const fullResult = await client.query(`
+      SELECT p.*, 
+             b.species, b.variety, b.sowing_date,
+             c.name AS container_name, c.type AS container_type
+      FROM plants p
+      JOIN batches b ON b.id = p.batch_id
+      LEFT JOIN containers c ON c.id = p.container_id
+      WHERE p.id = $1
+    `, [id]);
 
     await client.query('COMMIT');
 
-    res.json(updatedResult.rows[0]);
+    res.json(fullResult.rows[0]);
   } catch (err) {
     await client.query('ROLLBACK');
     console.error(err);
@@ -273,13 +278,12 @@ router.put('/:id/status', async (req, res) => {
 
     const current = currentResult.rows[0];
 
-    // Если статус не меняется — ничего не делаем
+    // Если статус не меняется — ничего не пишем
     if (current.status === status) {
       await client.query('ROLLBACK');
       return res.json(current);
     }
 
-    // Обновляем статус
     const updatedResult = await client.query(`
       UPDATE plants
       SET status = $1, updated_at = NOW()
@@ -287,7 +291,6 @@ router.put('/:id/status', async (req, res) => {
       RETURNING *
     `, [status, id]);
 
-    // Пишем событие в историю
     await client.query(`
       INSERT INTO plant_events 
         (plant_id, event_type, event_date, from_status, to_status, notes)

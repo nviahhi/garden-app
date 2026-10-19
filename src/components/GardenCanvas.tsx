@@ -31,6 +31,7 @@ function ContainerShape({
   onSelect,
   onPlantClick,
   onBatchClick,
+  onPlantDragEnd,
   onHoverChange,
 }: {
   container: Container;
@@ -41,13 +42,13 @@ function ContainerShape({
   onSelect: () => void;
   onPlantClick?: (plant: Plant) => void;
   onBatchClick?: (batch: Batch) => void;
+  onPlantDragEnd?: (plant: Plant, e: KonvaEventObject<DragEvent>) => void;
   onHoverChange: (hovered: boolean) => void;
 }) {
   const updateContainer = useContainerStore((s) => s.updateContainer);
 
   const snapToGrid = (value: number) => Math.round(value / GRID_SIZE) * GRID_SIZE;
 
-  // Визуально увеличиваем слишком маленькие контейнеры
   const displayContainer = {
     ...container,
     width: Math.max(container.width, MIN_CONTAINER_DISPLAY_PX),
@@ -114,6 +115,7 @@ function ContainerShape({
         batches={batches}
         onPlantClick={onPlantClick}
         onBatchClick={onBatchClick}
+        onPlantDragEnd={onPlantDragEnd}
       />
     </Group>
   );
@@ -132,6 +134,7 @@ export function GardenCanvas({
   const batches = useBatchStore((s) => s.batches);
   const loadPlants = useBatchStore((s) => s.loadPlants);
   const loadBatches = useBatchStore((s) => s.loadBatches);
+  const transplantPlant = useBatchStore((s) => s.transplantPlant);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
@@ -148,7 +151,6 @@ export function GardenCanvas({
     loadBatches();
   }, [loadContainers, loadPlants, loadBatches]);
 
-  // ===== Автоматическая подгонка под размер контейнера =====
   useEffect(() => {
     if (!zone || !containerRef.current) return;
 
@@ -177,7 +179,6 @@ export function GardenCanvas({
     return () => observer.disconnect();
   }, [zone]);
 
-  // ===== Сброс вида при смене зоны =====
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setZoom(1);
@@ -186,7 +187,6 @@ export function GardenCanvas({
     }
   }, [zone?.id]);
 
-  // ===== Курсор =====
   useEffect(() => {
     const stage = stageRef.current;
     if (!stage) return;
@@ -201,7 +201,6 @@ export function GardenCanvas({
     }
   }, [isOverContainer, isPanning]);
 
-  // ===== Zoom колесом мыши =====
   const handleWheel = (e: KonvaEventObject<WheelEvent>) => {
     e.evt.preventDefault();
 
@@ -264,7 +263,6 @@ export function GardenCanvas({
   const batchesByContainer = useMemo(() => {
     const map = new Map<number, Batch[]>();
 
-    // 1. Партии с явным container_id (россыпь, ячейки)
     for (const batch of batches) {
       if (batch.container_id != null) {
         const list = map.get(batch.container_id) ?? [];
@@ -273,7 +271,6 @@ export function GardenCanvas({
       }
     }
 
-    // 2. Партии, распределённые по горшкам (container_id = null)
     for (const batch of batches) {
       if (batch.container_id != null) continue;
 
@@ -292,6 +289,67 @@ export function GardenCanvas({
 
     return map;
   }, [batches, plants]);
+
+  const findContainerAtPoint = (stageX: number, stageY: number): Container | null => {
+    for (const c of zoneContainers) {
+      const w = Math.max(c.width, MIN_CONTAINER_DISPLAY_PX);
+      const h = Math.max(c.height, MIN_CONTAINER_DISPLAY_PX);
+      if (
+        stageX >= c.x && stageX <= c.x + w &&
+        stageY >= c.y && stageY <= c.y + h
+      ) {
+        return c;
+      }
+    }
+    return null;
+  };
+
+  const handlePlantDragEnd = (
+    plant: Plant,
+    e: KonvaEventObject<DragEvent>
+  ) => {
+    const stage = e.target.getStage();
+    if (!stage) return;
+
+    const pointer = stage.getPointerPosition();
+    if (!pointer) return;
+
+    const transform = stage.getAbsoluteTransform().copy().invert();
+    const stagePos = transform.point(pointer);
+
+    const target = findContainerAtPoint(stagePos.x, stagePos.y);
+
+    if (target && target.id !== plant.container_id) {
+      transplantPlant(plant.id, target.id);
+    }
+    // Сброс позиции делает сам PlantMarker в своём onDragEnd
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+
+    const plantIdStr = e.dataTransfer.getData('plantId');
+    if (!plantIdStr) return;
+
+    const plantId = Number(plantIdStr);
+    const plant = plants.find((p) => p.id === plantId);
+    if (!plant) return;
+
+    const stage = stageRef.current;
+    if (!stage) return;
+
+    const stageRect = stage.container().getBoundingClientRect();
+    const canvasX = e.clientX - stageRect.left;
+    const canvasY = e.clientY - stageRect.top;
+
+    const transform = stage.getAbsoluteTransform().copy().invert();
+    const stagePos = transform.point({ x: canvasX, y: canvasY });
+
+    const target = findContainerAtPoint(stagePos.x, stagePos.y);
+    if (target && target.id !== plant.container_id) {
+      transplantPlant(plant.id, target.id);
+    }
+  };
 
   const handleStageClick = (e: KonvaEventObject<MouseEvent>) => {
     if (e.target === e.target.getStage()) {
@@ -348,7 +406,15 @@ export function GardenCanvas({
         </button>
       </div>
 
-      <div ref={containerRef} className="canvas-container">
+      <div
+        ref={containerRef}
+        className="canvas-container"
+        onDragOver={(e) => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+        }}
+        onDrop={handleDrop}
+      >
         <Stage
           ref={stageRef}
           width={activeZone.canvas_width * scale}
@@ -386,6 +452,7 @@ export function GardenCanvas({
                 onSelect={() => onSelect(container.id)}
                 onPlantClick={onPlantClick}
                 onBatchClick={onBatchClick}
+                onPlantDragEnd={handlePlantDragEnd}
                 onHoverChange={setOverContainer}
               />
             ))}

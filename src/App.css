@@ -1386,3 +1386,13 @@ button {
 .zone-edit-btn-label {
   font-size: 14px;
 }
+
+.batch-plant-item.is-dragging {
+  opacity: 0.4;
+  background: #e8f5e9;
+  cursor: grabbing;
+}
+
+.batch-plant-item[draggable="true"] {
+  cursor: grab;
+}

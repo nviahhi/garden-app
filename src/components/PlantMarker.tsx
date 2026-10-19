@@ -8,47 +8,77 @@ interface PlantMarkerProps {
   y: number;
   radius?: number;
   onClick?: () => void;
+  onDragStart?: (e: KonvaEventObject<DragEvent>) => void;
+  onDragEnd?: (e: KonvaEventObject<DragEvent>) => void;
 }
 
-export function PlantMarker({ plant, x, y, radius = 11, onClick }: PlantMarkerProps) {
+export function PlantMarker({
+  plant,
+  x,
+  y,
+  radius = 10,
+  onClick,
+  onDragStart,
+  onDragEnd,
+}: PlantMarkerProps) {
   const handleClick = (e: KonvaEventObject<Event>) => {
     e.cancelBubble = true;
     onClick?.();
   };
 
-  const handleMouseEnter = (e: KonvaEventObject<MouseEvent>) => {
+  const handleDragStart = (e: KonvaEventObject<DragEvent>) => {
+    e.cancelBubble = true;
     const stage = e.target.getStage();
-    if (stage) stage.container().style.cursor = 'pointer';
+    if (stage) stage.container().style.cursor = 'grabbing';
+    onDragStart?.(e);
+  };
+
+  const handleDragEnd = (e: KonvaEventObject<DragEvent>) => {
+    e.cancelBubble = true;
+    const stage = e.target.getStage();
+    if (stage) stage.container().style.cursor = 'default';
+
+    onDragEnd?.(e);
+
+    e.target.position({ x, y });
+  };
+
+  const handleMouseEnter = (e: KonvaEventObject<MouseEvent>) => {
+    if (!onDragEnd) return;
+    const stage = e.target.getStage();
+    if (stage) stage.container().style.cursor = 'grab';
   };
 
   const handleMouseLeave = (e: KonvaEventObject<MouseEvent>) => {
+    if (!onDragEnd) return;
     const stage = e.target.getStage();
     if (stage) stage.container().style.cursor = 'default';
   };
 
   const color = PLANT_STATUS_COLORS[plant.status] ?? '#a5d6a7';
-
-  // Берём сквозной номер, fallback на локальный
   const num = plant.display_number ?? plant.number;
   const numberStr = String(num);
 
-  // Адаптивный шрифт под длину номера
   let fontSize: number;
   if (numberStr.length >= 4) fontSize = radius * 0.55;
   else if (numberStr.length === 3) fontSize = radius * 0.75;
   else if (numberStr.length === 2) fontSize = radius * 0.95;
   else fontSize = radius * 1.15;
 
+  const isDraggable = !!onDragEnd;
+
   return (
     <Group
       x={x}
       y={y}
+      draggable={isDraggable}
       onClick={handleClick}
       onTap={handleClick}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
-      {/* Основной кружок */}
       <Circle
         radius={radius}
         fill={color}
@@ -58,16 +88,12 @@ export function PlantMarker({ plant, x, y, radius = 11, onClick }: PlantMarkerPr
         shadowColor="rgba(0,0,0,0.25)"
         shadowOffsetY={1}
       />
-
-      {/* Внутренняя тонкая обводка — придаёт объём */}
       <Circle
         radius={radius - 1.5}
         stroke="rgba(255,255,255,0.7)"
         strokeWidth={1}
         listening={false}
       />
-
-      {/* Номер */}
       <Text
         text={numberStr}
         fontSize={fontSize}
