@@ -6,6 +6,7 @@ import {
   PLANT_STATUS_EMOJI,
   type Plant,
   type PlantStatus,
+  type Batch,
 } from '../types';
 
 // Фиксируем момент старта сессии — не вызываем Date.now() в рендере
@@ -15,6 +16,7 @@ interface PlantInfoPanelProps {
   plant: Plant;
   onClose: () => void;
   onTransplant: (plant: Plant) => void;
+  onBatchClick?: (batch: Batch) => void;
 }
 
 const EVENT_LABELS: Record<string, string> = {
@@ -27,7 +29,12 @@ const EVENT_LABELS: Record<string, string> = {
 
 const STATUS_ORDER: PlantStatus[] = ['sown', 'growing', 'flowering', 'fruiting', 'done'];
 
-export function PlantInfoPanel({ plant, onClose, onTransplant }: PlantInfoPanelProps) {
+export function PlantInfoPanel({
+  plant,
+  onClose,
+  onTransplant,
+  onBatchClick,
+}: PlantInfoPanelProps) {
   const allPlants = useBatchStore((s) => s.plants);
   const allBatches = useBatchStore((s) => s.batches);
   const setStatus = useBatchStore((s) => s.setPlantStatus);
@@ -83,12 +90,27 @@ export function PlantInfoPanel({ plant, onClose, onTransplant }: PlantInfoPanelP
           {currentPlant.species}
           {currentPlant.variety ? ` · ${currentPlant.variety}` : ''}
         </div>
+
         {batch && (
           <div className="batch-card-row">
             <span className="batch-label">Партия:</span>
-            <span>#{batch.id}</span>
+            {onBatchClick ? (
+              <button
+                type="button"
+                className="batch-link"
+                onClick={() => onBatchClick(batch)}
+                title="Открыть партию"
+              >
+                #{batch.id}
+                {batch.variety ? ` · ${batch.variety}` : ''}
+                <span className="batch-link-icon">→</span>
+              </button>
+            ) : (
+              <span>#{batch.id}</span>
+            )}
           </div>
         )}
+
         <div className="batch-card-row">
           <span className="batch-label">Статус:</span>
           <span>
@@ -96,6 +118,7 @@ export function PlantInfoPanel({ plant, onClose, onTransplant }: PlantInfoPanelP
             {PLANT_STATUS_LABELS[currentPlant.status] ?? currentPlant.status}
           </span>
         </div>
+
         {batch && (
           <div className="batch-card-row">
             <span className="batch-label">Посеяно:</span>
@@ -105,6 +128,7 @@ export function PlantInfoPanel({ plant, onClose, onTransplant }: PlantInfoPanelP
             </span>
           </div>
         )}
+
         <div className="batch-card-row">
           <span className="batch-label">Растёт в:</span>
           <span>
@@ -114,7 +138,6 @@ export function PlantInfoPanel({ plant, onClose, onTransplant }: PlantInfoPanelP
         </div>
       </div>
 
-      {/* Действия */}
       <button
         className="btn btn-primary btn-block"
         onClick={() => onTransplant(currentPlant)}
@@ -122,7 +145,6 @@ export function PlantInfoPanel({ plant, onClose, onTransplant }: PlantInfoPanelP
         🪴 Пересадить
       </button>
 
-      {/* Переключение статуса */}
       <div className="status-switcher">
         <span className="status-switcher-label">Изменить статус:</span>
         <div className="status-switcher-list">
@@ -141,7 +163,6 @@ export function PlantInfoPanel({ plant, onClose, onTransplant }: PlantInfoPanelP
         </div>
       </div>
 
-      {/* Добавление заметки */}
       <div className="field">
         <span>Заметка</span>
         <textarea
@@ -160,7 +181,6 @@ export function PlantInfoPanel({ plant, onClose, onTransplant }: PlantInfoPanelP
         </button>
       </div>
 
-      {/* История событий */}
       {currentPlant.events && currentPlant.events.length > 0 && (
         <div className="plant-history">
           <h4>История</h4>

@@ -1396,3 +1396,40 @@ button {
 .batch-plant-item[draggable="true"] {
   cursor: grab;
 }
+
+/* Ссылка на партию в карточке растения */
+.batch-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: #4a7c4a;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 2px;
+  transition: color 0.15s;
+}
+
+.batch-link:hover {
+  color: #2e7d32;
+  text-decoration-style: solid;
+}
+
+.batch-link-icon {
+  font-size: 11px;
+  opacity: 0.6;
+  transition:
+    transform 0.15s,
+    opacity 0.15s;
+}
+
+.batch-link:hover .batch-link-icon {
+  opacity: 1;
+  transform: translateX(2px);
+}

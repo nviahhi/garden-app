@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useZoneStore } from '../store/useZoneStore';
+import { useContainerStore } from '../store/useContainerStore';
 import {
   ZONE_CONTAINER_TYPES,
   type Container,
@@ -23,49 +24,86 @@ interface ContainerFormProps {
   submitLabel: string;
 }
 
+// Типы контейнеров, которые можно создать в UI
 const ALL_TYPE_OPTIONS: { value: ContainerType; label: string }[] = [
   { value: 'pot', label: 'Горшок' },
   { value: 'tray', label: 'Кассета' },
   { value: 'bed', label: 'Грядка' },
 ];
 
-const TYPE_LABELS: Record<ContainerType, string> = {
+// Русские названия для дефолтных имён
+// (без greenhouse — тип больше не используется для контейнеров)
+const TYPE_NAMES: Record<string, string> = {
   pot: 'Горшок',
   tray: 'Кассета',
-  bed: 'Грядка'
+  bed: 'Грядка',
 };
 
-const TYPE_DEFAULTS_CM: Record<ContainerType, { width: number; height: number }> = {
+// Дефолтные размеры в см
+const TYPE_DEFAULTS_CM: Record<string, { width: number; height: number }> = {
   pot: { width: 5, height: 5 },
   tray: { width: 30, height: 20 },
-  bed: { width: 300, height: 200 }
+  bed: { width: 300, height: 200 },
 };
+
+// Следующий номер для типа в текущей зоне
+function getNextNumber(
+  containers: Container[],
+  zoneId: number | null,
+  type: ContainerType
+): number {
+  const typeName = TYPE_NAMES[type] ?? type;
+  const prefix = typeName + ' ';
+
+  let max = 0;
+  for (const c of containers) {
+    if (c.zone_id !== zoneId) continue;
+    if (c.type !== type) continue;
+    if (c.name.startsWith(prefix)) {
+      const n = parseInt(c.name.slice(prefix.length), 10);
+      if (!isNaN(n) && n > max) max = n;
+    }
+  }
+  return max + 1;
+}
 
 export function ContainerForm({ initial, onSubmit, onCancel, submitLabel }: ContainerFormProps) {
   const zones = useZoneStore((s) => s.zones);
   const currentZone = useZoneStore((s) => s.currentZone);
+  const allContainers = useContainerStore((s) => s.containers);
 
   const isEdit = !!initial?.id;
 
+  // Зона контейнера (для пересчёта см → px)
   const containerZoneId = initial?.zone_id ?? currentZone?.id ?? null;
   const containerZone = zones.find((z) => z.id === containerZoneId);
   const containerPxPerCm = containerZone?.px_per_cm ?? 10;
 
+  // Тип целевой зоны — определяет доступные типы контейнеров
+  const initialType: ContainerType = initial?.type ?? 'pot';
   const [zoneId, setZoneId] = useState<number | null>(containerZoneId);
-  const [name, setName] = useState(initial?.name ?? '');
 
   const targetZoneForTypes = zones.find((z) => z.id === zoneId);
   const zoneType = targetZoneForTypes?.type ?? currentZone?.type ?? 'surface';
 
   const allowedTypes = ZONE_CONTAINER_TYPES[zoneType] ?? ['pot', 'tray'];
-  const initialType = initial?.type ?? allowedTypes[0];
-
   const visibleTypeOptions = ALL_TYPE_OPTIONS.filter((o) =>
     allowedTypes.includes(o.value)
   );
 
-  const initialDefaults = TYPE_DEFAULTS_CM[initialType];
+  // ===== Дефолтное имя =====
+  const defaultName = isEdit
+    ? (initial?.name ?? '')
+    : `${TYPE_NAMES[initialType] ?? initialType} ${getNextNumber(
+        allContainers,
+        containerZoneId,
+        initialType
+      )}`;
+
+  const [name, setName] = useState(defaultName);
   const [type, setType] = useState<ContainerType>(initialType);
+
+  const initialDefaults = TYPE_DEFAULTS_CM[initialType] ?? TYPE_DEFAULTS_CM.pot;
 
   const [widthCm, setWidthCm] = useState(
     initial?.width
@@ -83,14 +121,31 @@ export function ContainerForm({ initial, onSubmit, onCancel, submitLabel }: Cont
 
   const handleTypeChange = (newType: ContainerType) => {
     setType(newType);
-    const defaults = TYPE_DEFAULTS_CM[newType];
+    const defaults = TYPE_DEFAULTS_CM[newType] ?? TYPE_DEFAULTS_CM.pot;
     setWidthCm(defaults.width);
     setHeightCm(defaults.height);
+
+    // Если пользователь не менял имя вручную — обновляем под новый тип
+    if (!isEdit) {
+      const currentDefault = `${TYPE_NAMES[type] ?? type} ${getNextNumber(
+        allContainers,
+        containerZoneId,
+        type
+      )}`;
+      if (name === currentDefault) {
+        setName(
+          `${TYPE_NAMES[newType] ?? newType} ${getNextNumber(
+            allContainers,
+            containerZoneId,
+            newType
+          )}`
+        );
+      }
+    }
   };
 
   const handleZoneChange = (newZoneId: number | null) => {
     setZoneId(newZoneId);
-
     if (newZoneId == null) return;
 
     const targetZone = zones.find((z) => z.id === newZoneId);
@@ -104,7 +159,7 @@ export function ContainerForm({ initial, onSubmit, onCancel, submitLabel }: Cont
       const fallback = allowed[0];
       setType(fallback);
 
-      const defaults = TYPE_DEFAULTS_CM[fallback];
+      const defaults = TYPE_DEFAULTS_CM[fallback] ?? TYPE_DEFAULTS_CM.pot;
       setWidthCm(defaults.width);
       setHeightCm(defaults.height);
     }
@@ -140,6 +195,11 @@ export function ContainerForm({ initial, onSubmit, onCancel, submitLabel }: Cont
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
+          onFocus={(e) => {
+            // Ставим курсор в конец — удобно дописывать
+            const len = e.target.value.length;
+            e.target.setSelectionRange(len, len);
+          }}
           placeholder="Например, Плошка №1"
           autoFocus
         />
@@ -186,7 +246,9 @@ export function ContainerForm({ initial, onSubmit, onCancel, submitLabel }: Cont
       ) : (
         <div className="field-readonly-block">
           <span className="field-readonly-label">Тип:</span>
-          <span className="field-readonly-value">{TYPE_LABELS[type]}</span>
+          <span className="field-readonly-value">
+            {TYPE_NAMES[type] ?? type}
+          </span>
         </div>
       )}
 

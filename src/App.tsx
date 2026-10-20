@@ -179,6 +179,10 @@ function App() {
           plant={selectedPlant}
           onClose={() => setSelectedPlant(null)}
           onTransplant={(p) => setTransplantPlant(p)}
+          onBatchClick={(b) => {
+            setSelectedBatch(b);
+            setSelectedPlant(null);
+          }}
         />
       )}
 

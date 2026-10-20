@@ -42,14 +42,20 @@ export function ContainerPlants({
   const badgeBatchIds = new Set<number>();
   for (const batch of batches) {
     const batchPlants = plants.filter((p) => p.batch_id === batch.id);
+
+    // 1. Растения по ячейкам кассеты — маркерами
     const hasCellPlants = batchPlants.some((p) => p.cell_index !== null);
     if (hasCellPlants) continue;
 
-    // Если у партии есть растения в других контейнерах,
-    // но здесь — ни одного, то бейдж не показываем.
+    // 2. Партия распределена по отдельным горшкам (container_id = null) —
+    //    в каждом горшке рисуем маркером, не бейджем
+    if (batch.container_id === null) continue;
+
+    // 3. Партия «переехала» целиком — в этом контейнере её растений нет
     const totalPlants = batch.plants_count ?? 0;
     if (totalPlants > 0 && batchPlants.length === 0) continue;
 
+    // 4. Россыпь в одном контейнере — бейджем
     badgeBatchIds.add(batch.id);
   }
 
