@@ -16,6 +16,7 @@ const MIN_CONTAINER_DISPLAY_PX = 40;
 
 interface GardenCanvasProps {
   selectedId: number | null;
+  selectedPlantId?: number | null;
   onSelect: (id: number | null) => void;
   onPlantClick?: (plant: Plant) => void;
   onBatchClick?: (batch: Batch) => void;
@@ -28,6 +29,7 @@ function ContainerShape({
   batches,
   isSelected,
   isHighlighted,
+  selectedPlantId,
   onSelect,
   onPlantClick,
   onBatchClick,
@@ -39,6 +41,7 @@ function ContainerShape({
   batches: Batch[];
   isSelected: boolean;
   isHighlighted: boolean;
+  selectedPlantId?: number | null;
   onSelect: () => void;
   onPlantClick?: (plant: Plant) => void;
   onBatchClick?: (batch: Batch) => void;
@@ -113,6 +116,7 @@ function ContainerShape({
         container={displayContainer}
         plants={plants}
         batches={batches}
+        selectedPlantId={selectedPlantId}
         onPlantClick={onPlantClick}
         onBatchClick={onBatchClick}
         onPlantDragEnd={onPlantDragEnd}
@@ -123,6 +127,7 @@ function ContainerShape({
 
 export function GardenCanvas({
   selectedId,
+  selectedPlantId,
   onSelect,
   onPlantClick,
   onBatchClick,
@@ -322,7 +327,6 @@ export function GardenCanvas({
     if (target && target.id !== plant.container_id) {
       transplantPlant(plant.id, target.id);
     }
-    // Сброс позиции делает сам PlantMarker в своём onDragEnd
   };
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
@@ -449,6 +453,7 @@ export function GardenCanvas({
                 batches={batchesByContainer.get(container.id) ?? []}
                 isSelected={selectedId === container.id}
                 isHighlighted={highlightedContainerIds?.has(container.id) ?? false}
+                selectedPlantId={selectedPlantId}
                 onSelect={() => onSelect(container.id)}
                 onPlantClick={onPlantClick}
                 onBatchClick={onBatchClick}

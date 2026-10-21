@@ -16,6 +16,7 @@ interface ContainerPlantsProps {
   container: Container;
   plants: Plant[];
   batches: Batch[];
+  selectedPlantId?: number | null;
   onPlantClick?: (plant: Plant) => void;
   onBatchClick?: (batch: Batch) => void;
   onPlantDragEnd?: (plant: Plant, e: KonvaEventObject<DragEvent>) => void;
@@ -25,6 +26,7 @@ export function ContainerPlants({
   container,
   plants,
   batches,
+  selectedPlantId,
   onPlantClick,
   onBatchClick,
   onPlantDragEnd,
@@ -47,15 +49,17 @@ export function ContainerPlants({
     const hasCellPlants = batchPlants.some((p) => p.cell_index !== null);
     if (hasCellPlants) continue;
 
-    // 2. Партия распределена по отдельным горшкам (container_id = null) —
-    //    в каждом горшке рисуем маркером, не бейджем
+    // 2. Партия в горшке — всегда маркерами
+    if (container.type === 'pot') continue;
+
+    // 3. Партия распределена по разным горшкам — маркерами
     if (batch.container_id === null) continue;
 
-    // 3. Партия «переехала» целиком — в этом контейнере её растений нет
+    // 4. Партия «переехала» целиком — в этом контейнере её растений нет
     const totalPlants = batch.plants_count ?? 0;
     if (totalPlants > 0 && batchPlants.length === 0) continue;
 
-    // 4. Россыпь в одном контейнере — бейджем
+    // 5. Россыпь в кассете / грядке — бейджем
     badgeBatchIds.add(batch.id);
   }
 
@@ -105,6 +109,7 @@ export function ContainerPlants({
           x={cx}
           y={cy}
           radius={radius}
+          isSelected={plant.id === selectedPlantId}
           onClick={() => onPlantClick?.(plant)}
           onDragEnd={
             onPlantDragEnd
@@ -173,6 +178,7 @@ export function ContainerPlants({
             x={cx}
             y={cy}
             radius={radius}
+            isSelected={plant.id === selectedPlantId}
             onClick={() => onPlantClick?.(plant)}
             onDragEnd={
               onPlantDragEnd

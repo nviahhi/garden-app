@@ -7,6 +7,7 @@ interface PlantMarkerProps {
   x: number;
   y: number;
   radius?: number;
+  isSelected?: boolean;
   onClick?: () => void;
   onDragStart?: (e: KonvaEventObject<DragEvent>) => void;
   onDragEnd?: (e: KonvaEventObject<DragEvent>) => void;
@@ -17,6 +18,7 @@ export function PlantMarker({
   x,
   y,
   radius = 10,
+  isSelected = false,
   onClick,
   onDragStart,
   onDragEnd,
@@ -37,20 +39,16 @@ export function PlantMarker({
     e.cancelBubble = true;
     const stage = e.target.getStage();
     if (stage) stage.container().style.cursor = 'default';
-
     onDragEnd?.(e);
-
     e.target.position({ x, y });
   };
 
   const handleMouseEnter = (e: KonvaEventObject<MouseEvent>) => {
-    if (!onDragEnd) return;
     const stage = e.target.getStage();
-    if (stage) stage.container().style.cursor = 'grab';
+    if (stage) stage.container().style.cursor = onDragEnd ? 'grab' : 'pointer';
   };
 
   const handleMouseLeave = (e: KonvaEventObject<MouseEvent>) => {
-    if (!onDragEnd) return;
     const stage = e.target.getStage();
     if (stage) stage.container().style.cursor = 'default';
   };
@@ -79,21 +77,34 @@ export function PlantMarker({
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
+
+      {/* Внешнее кольцо выделения */}
+      {isSelected && (
+        <Circle
+          radius={radius + 4}
+          stroke="rgba(46, 125, 50, 0.35)"
+          strokeWidth={8}
+          listening={false}
+        />
+      )}
+
       <Circle
         radius={radius}
         fill={color}
-        stroke="#2e4a2e"
-        strokeWidth={1.5}
-        shadowBlur={4}
-        shadowColor="rgba(0,0,0,0.25)"
+        stroke={isSelected ? '#1b5e20' : '#2e4a2e'}
+        strokeWidth={isSelected ? 2.5 : 1.5}
+        shadowBlur={isSelected ? 12 : 4}
+        shadowColor={isSelected ? '#4caf50' : 'rgba(0,0,0,0.25)'}
         shadowOffsetY={1}
       />
+
       <Circle
         radius={radius - 1.5}
         stroke="rgba(255,255,255,0.7)"
         strokeWidth={1}
         listening={false}
       />
+
       <Text
         text={numberStr}
         fontSize={fontSize}
