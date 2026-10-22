@@ -13,6 +13,8 @@ import { TransplantModal } from './components/TransplantModal';
 import { ZoneSwitcher } from './components/ZoneSwitcher';
 import { ZoneModal } from './components/ZoneModal';
 import { PlantSearch } from './components/PlantSearch';
+import { exportApi } from './api/export';
+import { exportPlantsToPdf } from './utils/pdfExport';
 import { useContainerStore } from './store/useContainerStore';
 import { useBatchStore } from './store/useBatchStore';
 import { useZoneStore } from './store/useZoneStore';
@@ -32,6 +34,7 @@ function App() {
   const batches = useBatchStore((s) => s.batches);
 
   const currentZone = useZoneStore((s) => s.currentZone);
+  const zones = useZoneStore((s) => s.zones);
   const loadZones = useZoneStore((s) => s.loadZones);
   const selectZone = useZoneStore((s) => s.selectZone);
 
@@ -45,22 +48,20 @@ function App() {
 
   const [isCreateContainerOpen, setCreateContainerOpen] = useState(false);
   const [isCreateBatchOpen, setCreateBatchOpen] = useState(false);
-  const [zoneModal, setZoneModal] = useState<ZoneModalState>(null);
   const [isSearchOpen, setSearchOpen] = useState(false);
+  const [zoneModal, setZoneModal] = useState<ZoneModalState>(null);
+  const [exportingAll, setExportingAll] = useState(false);
 
-  // Загружаем зоны при монтировании
   useEffect(() => {
     loadZones();
   }, [loadZones]);
 
-  // Загружаем данные после выбора зоны
   useEffect(() => {
     loadContainers();
     loadBatches();
     loadPlants();
   }, [loadContainers, loadBatches, loadPlants]);
 
-  // Подгружаем события выбранного растения
   useEffect(() => {
     if (selectedPlant) {
       loadPlantWithEvents(selectedPlant.id);
@@ -79,14 +80,15 @@ function App() {
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
-  // Контейнеры текущей зоны
   const zoneContainers = useMemo(
     () => containers.filter((c) => c.zone_id === currentZone?.id),
     [containers, currentZone]
   );
 
-  const selectedContainer = zoneContainers.find((c) => c.id === selectedId) ?? null;
+  const selectedContainer =
+    zoneContainers.find((c) => c.id === selectedId) ?? null;
 
+  // ===== Подсветка контейнеров по выбранной партии =====
   const highlightedContainerIds = useMemo(() => {
     if (!selectedBatch) return new Set<number>();
     const ids = new Set<number>();
@@ -102,40 +104,25 @@ function App() {
     return ids;
   }, [selectedBatch, plants]);
 
-  // Контейнер выбранного растения — если у него нет маркера (партия бейджем),
-  // подсвечиваем контейнер, чтобы пользователь видел, где растение.
+  // ===== Подсветка контейнера, если у выбранного растения нет маркера =====
   const selectedPlantHighlightIds = useMemo(() => {
     const ids = new Set<number>();
     if (!selectedPlant) return ids;
     if (selectedPlant.container_id == null) return ids;
 
-    const container = containers.find((c) => c.id === selectedPlant.container_id);
+    const container = containers.find(
+      (c) => c.id === selectedPlant.container_id
+    );
     if (!container) return ids;
 
     const batch = batches.find((b) => b.id === selectedPlant.batch_id);
     if (!batch) return ids;
 
-    // ===== Проверяем, будет ли у растения МАРКЕР в ContainerPlants =====
-    // Логика из ContainerPlants: маркер есть, если
-    // 1. cell_index !== null, ИЛИ
-    // 2. контейнер — горшок, ИЛИ
-    // 3. партия распределена по горшкам (container_id === null), ИЛИ
-    // 4. партия в другом контейнере (гость), ИЛИ
-    // 5. партия в этом контейнере, но есть растения с cell_index (маркеры в ячейках)
-
-    // 1. Есть ячейка — точно маркер
     if (selectedPlant.cell_index !== null) return ids;
-
-    // 2. Горшок — точно маркер
     if (container.type === 'pot') return ids;
-
-    // 3. Распределённая партия — точно маркер
     if (batch.container_id === null) return ids;
-
-    // 4. Гость — партия из другого контейнера, у неё здесь маркер
     if (batch.container_id !== container.id) return ids;
 
-    // 5. Партия в этом контейнере — маркер есть, если есть растения по ячейкам
     const hasCellPlants = plants.some(
       (p) =>
         p.batch_id === batch.id &&
@@ -144,12 +131,10 @@ function App() {
     );
     if (hasCellPlants) return ids;
 
-    // ===== Маркера нет — партия показана бейджем, подсвечиваем контейнер =====
     ids.add(container.id);
     return ids;
   }, [selectedPlant, containers, batches, plants]);
 
-  // Объединённая подсветка
   const effectiveHighlightedContainerIds = useMemo(() => {
     if (selectedPlantHighlightIds.size === 0) return highlightedContainerIds;
     const merged = new Set(highlightedContainerIds);
@@ -176,10 +161,30 @@ function App() {
   };
 
   const handleZoneSwitch = () => {
-    // Сбрасываем всё выбранное при переключении зоны
     setSelectedId(null);
     setSelectedBatch(null);
     setSelectedPlant(null);
+  };
+
+  // ===== Экспорт ВСЕГО в PDF =====
+  const handleExportAll = async () => {
+    setExportingAll(true);
+    try {
+      const allPlants = await exportApi.plantsAll();
+      await exportPlantsToPdf({
+        title: 'Журнал рассады',
+        subtitle: 'Полный экспорт всех растений',
+        plants: allPlants,
+        zones,
+        containers,
+        filename: `garden-export-${new Date().toISOString().slice(0, 10)}.pdf`,
+      });
+    } catch (err) {
+      console.error(err);
+      alert('Не удалось сформировать PDF');
+    } finally {
+      setExportingAll(false);
+    }
   };
 
   return (
@@ -205,7 +210,10 @@ function App() {
         <ZoneSwitcher
           onSwitch={handleZoneSwitch}
           onCreate={() => setZoneModal({ mode: 'create' })}
-          onEdit={() => currentZone && setZoneModal({ mode: 'edit', zoneId: currentZone.id })}
+          onEdit={() =>
+            currentZone &&
+            setZoneModal({ mode: 'edit', zoneId: currentZone.id })
+          }
         />
 
         <div className="canvas-toolbar">
@@ -224,7 +232,16 @@ function App() {
             🔍 Поиск
           </button>
 
+          <button
+            className="btn btn-ghost"
+            onClick={handleExportAll}
+            disabled={exportingAll}
+            title="Экспорт всех растений в PDF"
+          >
+            {exportingAll ? '⏳ Формирую PDF...' : '📄 Экспорт'}
+          </button>
         </div>
+
         <GardenCanvas
           selectedId={selectedId}
           selectedPlantId={selectedPlant?.id ?? null}
@@ -299,12 +316,9 @@ function App() {
           onClose={() => setSearchOpen(false)}
           onSelect={async (p, zoneId) => {
             setSearchOpen(false);
-
-            // Переключаемся на нужную зону, если она отличается от текущей
             if (zoneId != null && zoneId !== currentZone?.id) {
               await selectZone(zoneId);
             }
-
             handlePlantClick(p);
           }}
         />
@@ -314,7 +328,10 @@ function App() {
         <ZoneModal
           mode={zoneModal.mode}
           zoneId={zoneModal.mode === 'edit' ? zoneModal.zoneId : undefined}
-          onClose={() => setZoneModal(null)}
+          onClose={() => {
+            setZoneModal(null);
+            loadZones();
+          }}
         />
       )}
     </div>
