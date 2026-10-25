@@ -13,6 +13,7 @@ import { TransplantModal } from './components/TransplantModal';
 import { ZoneSwitcher } from './components/ZoneSwitcher';
 import { ZoneModal } from './components/ZoneModal';
 import { PlantSearch } from './components/PlantSearch';
+import { StatsDashboard } from './components/StatsDashboard';
 import { exportApi } from './api/export';
 import { exportPlantsToPdf } from './utils/pdfExport';
 import { useContainerStore } from './store/useContainerStore';
@@ -51,6 +52,7 @@ function App() {
   const [isSearchOpen, setSearchOpen] = useState(false);
   const [zoneModal, setZoneModal] = useState<ZoneModalState>(null);
   const [exportingAll, setExportingAll] = useState(false);
+  const [isStatsOpen, setStatsOpen] = useState(false);
 
   useEffect(() => {
     loadZones();
@@ -240,6 +242,14 @@ function App() {
           >
             {exportingAll ? '⏳ Формирую PDF...' : '📄 Экспорт'}
           </button>
+
+          <button
+            className="btn btn-ghost"
+            onClick={() => setStatsOpen(true)}
+            title="Статистика"
+          >
+            📊 Статистика
+          </button>
         </div>
 
         <GardenCanvas
@@ -292,6 +302,10 @@ function App() {
 
       {isCreateBatchOpen && (
         <BatchCreateModal onClose={() => setCreateBatchOpen(false)} />
+      )}
+
+      {isStatsOpen && (
+        <StatsDashboard onClose={() => setStatsOpen(false)} />
       )}
 
       {germinateBatch && (

@@ -7,6 +7,7 @@ const batchesRouter = require('./routes/batches');
 const plantsRouter = require('./routes/plants');
 const zonesRouter = require('./routes/zones');
 const exportRouter = require('./routes/export');
+const statsRouter = require('./routes/stats');
 
 const app = express();
 app.use(cors());
@@ -21,6 +22,7 @@ app.use('/api/batches', batchesRouter);
 app.use('/api/plants', plantsRouter);
 app.use('/api/zones', zonesRouter);
 app.use('/api/export', exportRouter);
+app.use('/api/stats', statsRouter);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

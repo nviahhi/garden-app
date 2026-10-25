@@ -163,3 +163,72 @@ export const PLANT_STATUS_COLORS: Record<PlantStatus, string> = {
   fruiting: '#ffcc80',
   done: '#90a4ae',
 };
+
+// ===== Статистика =====
+export interface StatsTotals {
+  plants: number;
+  batches: number;
+  containers: number;
+  zones: number;
+  total_seeds: number;
+  orphans: number;
+  avg_age_days: number | null;
+  byStatus: Record<PlantStatus, number>;
+}
+
+export interface SpeciesStats {
+  species: string;
+  variety: string;
+  seeds: number;
+  batches: number;
+  plants: number;
+  germinated: number;
+  rate: number;
+}
+
+export interface ZoneStats {
+  id: number;
+  name: string;
+  type: ZoneType;
+  containers: number;
+  plants: number;
+}
+
+export interface MonthStats {
+  month: string; // 'YYYY-MM'
+  batches: number;
+  seeds: number;
+}
+
+export interface ContainerStats {
+  id: number;
+  name: string;
+  type: ContainerType;
+  zone_name: string | null;
+  plants: number;
+}
+
+export interface Stats {
+  totals: StatsTotals;
+  bySpecies: SpeciesStats[];
+  bySpeciesLocation: SpeciesLocationStats[];
+  byZone: ZoneStats[];
+  byMonth: MonthStats[];
+  topContainers: ContainerStats[];
+}
+
+export interface SpeciesLocation {
+  zone_id: number | null;
+  zone_name: string | null;
+  container_id: number | null;
+  container_name: string | null;
+  status_counts: Partial<Record<PlantStatus, number>>;
+  total: number;
+}
+
+export interface SpeciesLocationStats {
+  species: string;
+  variety: string;
+  total: number;
+  locations: SpeciesLocation[];
+}
