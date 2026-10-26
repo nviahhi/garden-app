@@ -274,10 +274,12 @@ button {
   padding: 20px;
   width: 360px;
   max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 32px);
   display: flex;
   flex-direction: column;
   gap: 16px;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
 }
 
 /* Узкие числовые поля (4 цифры) */
@@ -1078,7 +1080,7 @@ button {
 
 /* Модалка шире обычной */
 .modal-wide {
-  width: 500px;
+  width: 560px;
   max-width: calc(100vw - 32px);
 }
 
@@ -2047,4 +2049,120 @@ button {
   .species-row {
     grid-template-columns: 1fr 80px 40px;
   }
+}
+
+/* Пикер ячеек */
+.cell-picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: #6b8e6b;
+}
+
+.cell-picker-header strong {
+  color: #2e4a2e;
+}
+
+.cell-picker-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.cell-grid {
+  display: grid;
+  gap: 4px;
+  padding: 8px;
+  background: #fafaf5;
+  border: 1px solid #e0d8c8;
+  border-radius: 6px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.cell-cell {
+  aspect-ratio: 1 / 1;
+  min-width: 30px;
+  min-height: 30px;
+  background: #e8f5e9;
+  border: 1px solid #a5d6a7;
+  border-radius: 4px;
+  font-size: 11px;
+  color: #2e4a2e;
+  cursor: pointer;
+  font-family: inherit;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    transform 0.1s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cell-cell:hover:not(:disabled) {
+  border-color: #4a7c4a;
+  background: #c8e6c9;
+}
+
+.cell-cell:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.cell-cell.is-selected {
+  background: #4caf50;
+  border-color: #2e7d32;
+  color: white;
+  font-weight: 700;
+}
+
+.cell-cell.is-occupied {
+  background: #eceff1;
+  border-color: #cfd8dc;
+  color: #b0bec5;
+  cursor: not-allowed;
+  text-decoration: line-through;
+}
+
+/* Ошибка формы */
+.form-error {
+  padding: 10px 14px;
+  background: #fdecea;
+  border: 1px solid #f5c6cb;
+  border-radius: 6px;
+  color: #b71c1c;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+/* Скролл внутри модалки (для длинных форм вроде BatchCreateModal) */
+.modal > .container-form,
+.modal > form,
+.modal .container-form {
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+  padding-right: 4px; /* место под скроллбар */
+  margin-right: -4px; /* компенсируем padding, чтобы не смещать */
+}
+
+/* Кастомный тонкий скроллбар внутри модалки */
+.modal .container-form::-webkit-scrollbar {
+  width: 8px;
+}
+
+.modal .container-form::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.modal .container-form::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+}
+
+.modal .container-form::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
 }

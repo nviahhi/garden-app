@@ -3,47 +3,81 @@ import { useBatchStore } from '../store/useBatchStore';
 import { useContainerStore } from '../store/useContainerStore';
 import { useZoneStore } from '../store/useZoneStore';
 
+type Mode = 'scattered' | 'cells' | 'pots';
+
 interface BatchCreateModalProps {
   onClose: () => void;
   presetContainerId?: number;
 }
 
-type Mode = 'scattered' | 'cells' | 'pots';
-
 export function BatchCreateModal({ onClose, presetContainerId }: BatchCreateModalProps) {
   const allContainers = useContainerStore((s) => s.containers);
-  const currentZone = useZoneStore((s) => s.currentZone);
-  const containers = allContainers.filter((c) => c.zone_id === currentZone?.id);
+  const plants = useBatchStore((s) => s.plants);
   const createBatch = useBatchStore((s) => s.createBatch);
+  const currentZone = useZoneStore((s) => s.currentZone);
+
+  // Только контейнеры текущей зоны
+  const containers = allContainers.filter((c) => c.zone_id === currentZone?.id);
 
   const [species, setSpecies] = useState('');
   const [variety, setVariety] = useState('');
-  const [sowingDate, setSowingDate] = useState(new Date().toISOString().slice(0, 10));
+  const [sowingDate, setSowingDate] = useState(
+    new Date().toISOString().slice(0, 10)
+  );
   const [seedsCount, setSeedsCount] = useState(10);
-  const [containerId, setContainerId] = useState<number | ''>(presetContainerId ?? '');
+  const [containerId, setContainerId] = useState<number | ''>(
+    presetContainerId ?? ''
+  );
   const [selectedPots, setSelectedPots] = useState<number[]>([]);
+  const [selectedCells, setSelectedCells] = useState<number[]>([]);
   const [mode, setMode] = useState<Mode>('scattered');
   const [notes, setNotes] = useState('');
-
-  // Контейнеры с сеткой (для режима «по ячейкам»)
-  const gridContainers = containers.filter((c) => c.cols && c.rows);
-  const hasGrid = gridContainers.length > 0;
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   const selectedContainer = containers.find((c) => c.id === containerId);
-  const selectedHasGrid = !!(selectedContainer?.cols && selectedContainer?.rows);
+  const hasGrid = !!(selectedContainer?.cols && selectedContainer?.rows);
+  const totalCells = hasGrid
+    ? selectedContainer!.cols! * selectedContainer!.rows!
+    : 0;
 
-  // Эффективный режим
+  // Занятые ячейки — вычисляем напрямую (без useMemo).
+  // Это дёшево: Set на нескольких десятках растений.
+  const occupiedCells = new Set<number>();
+  if (selectedContainer) {
+    for (const p of plants) {
+      if (p.container_id === selectedContainer.id && p.cell_index !== null) {
+        occupiedCells.add(p.cell_index);
+      }
+    }
+  }
+
+  const freeCellsCount = totalCells - occupiedCells.size;
+
+  // Эффективный режим (derived state, без useState/useEffect)
   let effectiveMode: Mode = mode;
   if (mode === 'cells' && !hasGrid) effectiveMode = 'scattered';
   if (mode === 'pots' && containers.length === 0) effectiveMode = 'scattered';
 
-  // При переключении в режим «по ячейкам» — если текущий контейнер без сетки,
-  // автоматически выбираем первый контейнер с сеткой
+  // ===== Обработчики смены селектов — сбрасываем зависимое состояние =====
+  const handleContainerChange = (value: number | '') => {
+    setContainerId(value);
+    setSelectedCells([]);
+    setError(null);
+  };
+
   const handleModeChange = (newMode: Mode) => {
     setMode(newMode);
+    setError(null);
+
     if (newMode === 'cells') {
-      if (!selectedHasGrid && gridContainers.length > 0) {
-        setContainerId(gridContainers[0].id);
+      // Если выбранный контейнер без сетки — подставить первый с сеткой
+      if (!selectedContainer?.cols || !selectedContainer?.rows) {
+        const gridContainer = containers.find((c) => c.cols && c.rows);
+        if (gridContainer) {
+          setContainerId(gridContainer.id);
+          setSelectedCells([]);
+        }
       }
     }
   };
@@ -54,8 +88,31 @@ export function BatchCreateModal({ onClose, presetContainerId }: BatchCreateModa
     );
   };
 
+  const toggleCell = (cellIndex: number) => {
+    if (occupiedCells.has(cellIndex)) return;
+    setSelectedCells((prev) =>
+      prev.includes(cellIndex)
+        ? prev.filter((c) => c !== cellIndex)
+        : [...prev, cellIndex]
+    );
+  };
+
+  const handleSelectAllFree = () => {
+    const free: number[] = [];
+    for (let i = 0; i < totalCells; i++) {
+      if (!occupiedCells.has(i)) free.push(i);
+    }
+    setSelectedCells(free);
+  };
+
+  const handleClearCells = () => {
+    setSelectedCells([]);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
+
     if (!species.trim()) return;
 
     const payload: Parameters<typeof createBatch>[0] = {
@@ -67,32 +124,56 @@ export function BatchCreateModal({ onClose, presetContainerId }: BatchCreateModa
     };
 
     if (effectiveMode === 'scattered') {
-      payload.container_id = containerId ? Number(containerId) : undefined;
-    } else if (effectiveMode === 'cells' && selectedContainer) {
-      const total = selectedContainer.cols! * selectedContainer.rows!;
-      const count = Math.min(seedsCount, total);
+      if (!containerId) {
+        setError('Выберите контейнер');
+        return;
+      }
+      payload.container_id = Number(containerId);
+    } else if (effectiveMode === 'cells') {
+      if (!selectedContainer) {
+        setError('Выберите кассету');
+        return;
+      }
+      if (selectedCells.length === 0) {
+        setError('Выберите хотя бы одну ячейку');
+        return;
+      }
       payload.container_id = selectedContainer.id;
-      payload.cell_indices = Array.from({ length: count }, (_, i) => i);
-      payload.seeds_count = count;
+      payload.cell_indices = selectedCells;
+      payload.seeds_count = selectedCells.length;
     } else if (effectiveMode === 'pots') {
-      if (selectedPots.length === 0) return;
+      if (selectedPots.length === 0) {
+        setError('Выберите хотя бы один горшок');
+        return;
+      }
       payload.container_ids = selectedPots;
       payload.seeds_count = selectedPots.length;
     }
 
-    const ok = await createBatch(payload);
-    if (ok) onClose();
+    setSubmitting(true);
+    const result = await createBatch(payload);
+    setSubmitting(false);
+
+    if (result.success) {
+      onClose();
+    } else {
+      setError(result.error ?? 'Не удалось создать партию');
+    }
   };
 
-  // Список контейнеров для дропдауна — в режиме ячеек только с сеткой
-  const dropdownContainers = effectiveMode === 'cells' ? gridContainers : containers;
+  const dropdownContainers =
+    effectiveMode === 'cells'
+      ? containers.filter((c) => c.cols && c.rows)
+      : containers;
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal modal-wide" onClick={(e) => e.stopPropagation()}>
         <div className="panel-header">
           <h3>Новая партия</h3>
-          <button className="btn-icon" onClick={onClose} aria-label="Закрыть">×</button>
+          <button className="btn-icon" onClick={onClose} aria-label="Закрыть">
+            ×
+          </button>
         </div>
 
         <form className="container-form" onSubmit={handleSubmit}>
@@ -126,19 +207,10 @@ export function BatchCreateModal({ onClose, presetContainerId }: BatchCreateModa
                 onChange={(e) => setSowingDate(e.target.value)}
               />
             </label>
-            <label className="field">
-              <span>Семян *</span>
-              {effectiveMode === 'pots' ? (
-                <>
-                  <input
-                    type="text"
-                    value={`${selectedPots.length}`}
-                    readOnly
-                    className="field-narrow field-readonly"
-                  />
-                  <span className="field-hint">по числу выбранных горшков</span>
-                </>  
-              ) : (
+
+            {effectiveMode !== 'cells' && effectiveMode !== 'pots' && (
+              <label className="field">
+                <span>Семян *</span>
                 <input
                   type="number"
                   min={1}
@@ -147,11 +219,11 @@ export function BatchCreateModal({ onClose, presetContainerId }: BatchCreateModa
                   onChange={(e) => setSeedsCount(Number(e.target.value))}
                   className="field-narrow"
                 />
-              )}
-            </label>
+              </label>
+            )}
           </div>
 
-          {/* Выбор режима */}
+          {/* Режим */}
           <div className="field">
             <span>Как сеем?</span>
             <div className="radio-group">
@@ -164,14 +236,14 @@ export function BatchCreateModal({ onClose, presetContainerId }: BatchCreateModa
                 Россыпью в контейнер
               </label>
 
-              {hasGrid && (
+              {containers.some((c) => c.cols && c.rows) && (
                 <label className="radio">
                   <input
                     type="radio"
                     checked={effectiveMode === 'cells'}
                     onChange={() => handleModeChange('cells')}
                   />
-                  По ячейкам контейнера
+                  По ячейкам кассеты
                 </label>
               )}
 
@@ -188,20 +260,19 @@ export function BatchCreateModal({ onClose, presetContainerId }: BatchCreateModa
             </div>
           </div>
 
-          {/* Контейнер — для scattered и cells */}
+          {/* Контейнер для россыпи и ячеек */}
           {(effectiveMode === 'scattered' || effectiveMode === 'cells') && (
             <label className="field">
-              <span>
-                Контейнер
-                {effectiveMode === 'cells' && selectedContainer?.cols && selectedContainer?.rows && (
-                  <> · {selectedContainer.cols}×{selectedContainer.rows}</>
-                )}
-              </span>
+              <span>Контейнер</span>
               <select
                 value={containerId}
-                onChange={(e) => setContainerId(e.target.value ? Number(e.target.value) : '')}
+                onChange={(e) =>
+                  handleContainerChange(
+                    e.target.value ? Number(e.target.value) : ''
+                  )
+                }
               >
-                <option value="">— не выбран —</option>
+                <option value="">— выберите контейнер —</option>
                 {dropdownContainers.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
@@ -210,6 +281,70 @@ export function BatchCreateModal({ onClose, presetContainerId }: BatchCreateModa
                 ))}
               </select>
             </label>
+          )}
+
+          {/* Сетка ячеек для режима "по ячейкам" */}
+          {effectiveMode === 'cells' && selectedContainer && hasGrid && (
+            <div className="field">
+              <div className="cell-picker-header">
+                <span>
+                  Выберите ячейки · выбрано{' '}
+                  <strong>{selectedCells.length}</strong> из {freeCellsCount}{' '}
+                  свободных
+                </span>
+                <div className="cell-picker-actions">
+                  <button
+                    type="button"
+                    className="btn-sm"
+                    onClick={handleSelectAllFree}
+                    disabled={freeCellsCount === 0}
+                  >
+                    Все свободные
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-sm"
+                    onClick={handleClearCells}
+                    disabled={selectedCells.length === 0}
+                  >
+                    Сбросить
+                  </button>
+                </div>
+              </div>
+
+              <div
+                className="cell-grid"
+                style={{
+                  gridTemplateColumns: `repeat(${selectedContainer.cols}, 1fr)`,
+                }}
+              >
+                {Array.from({ length: totalCells }).map((_, i) => {
+                  const isOccupied = occupiedCells.has(i);
+                  const isSelected = selectedCells.includes(i);
+
+                  return (
+                    <button
+                      key={i}
+                      type="button"
+                      disabled={isOccupied}
+                      className={`cell-cell ${isOccupied ? 'is-occupied' : ''} ${isSelected ? 'is-selected' : ''}`}
+                      onClick={() => toggleCell(i)}
+                      title={
+                        isOccupied
+                          ? `Ячейка #${i + 1} занята`
+                          : `Ячейка #${i + 1}`
+                      }
+                    >
+                      {i + 1}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <span className="field-hint">
+                Серые ячейки заняты. Нажмите на свободные, чтобы выбрать.
+              </span>
+            </div>
           )}
 
           {/* По горшкам — мультивыбор */}
@@ -241,16 +376,23 @@ export function BatchCreateModal({ onClose, presetContainerId }: BatchCreateModa
             />
           </label>
 
+          {error && <div className="form-error">{error}</div>}
+
           <div className="form-actions">
-            <button type="button" className="btn btn-ghost" onClick={onClose}>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={onClose}
+              disabled={submitting}
+            >
               Отмена
             </button>
             <button
               type="submit"
               className="btn btn-primary"
-              disabled={!species.trim() || (effectiveMode === 'pots' && selectedPots.length === 0)}
+              disabled={!species.trim() || submitting}
             >
-              Создать
+              {submitting ? 'Создаю...' : 'Создать'}
             </button>
           </div>
         </form>

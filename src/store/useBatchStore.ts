@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import axios from 'axios';
 import { batchesApi, type CreateBatchPayload } from '../api/batches';
 import { plantsApi } from '../api/plants';
 import type { Batch, Plant } from '../types';
@@ -10,7 +11,7 @@ interface BatchState {
 
   loadBatches: () => Promise<void>;
   loadPlants: () => Promise<void>;
-  createBatch: (payload: CreateBatchPayload) => Promise<boolean>;
+  createBatch: (payload: CreateBatchPayload) => Promise<{ success: boolean; error?: string }>;
   removeBatch: (id: number) => Promise<void>;
   germinateBatch: (batchId: number, count: number) => Promise<boolean>;
   markGerminated: (batchId: number) => Promise<boolean>;
@@ -61,10 +62,15 @@ export const useBatchStore = create<BatchState>((set, get) => ({
       await batchesApi.create(payload);
       await get().loadBatches();
       await get().loadPlants();
-      return true;
+      return { success: true };
     } catch (err) {
       console.error('Ошибка создания партии:', err);
-      return false;
+
+      let message = 'Не удалось создать партию';
+      if (axios.isAxiosError(err) && err.response?.data?.error) {
+        message = err.response.data.error;
+      }
+      return { success: false, error: message };
     }
   },
 
