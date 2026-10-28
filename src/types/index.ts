@@ -47,6 +47,7 @@ export interface Zone {
   width_cm: number | null;
   depth_cm: number | null;
   shelf_count: number | null;
+  is_demo?: boolean;
 }
 
 export const ZONE_TYPE_LABELS: Record<ZoneType, string> = {
@@ -98,6 +99,7 @@ export interface Batch {
   plants_count?: number;
   container_name?: string | null;
   container_type?: string | null;
+  is_demo?: boolean;
 }
 
 // ===== Растения =====

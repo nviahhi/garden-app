@@ -1,7 +1,5 @@
-import axios from 'axios';
+import client from './client';
 import type { Plant, PlantEvent } from '../types';
-
-const api = axios.create({ baseURL: '/api' });
 
 export interface PlantWithEvents extends Plant {
   events: PlantEvent[];
@@ -13,12 +11,12 @@ export const plantsApi = {
     batch_id?: number;
     status?: string;
   }): Promise<Plant[]> => {
-    const { data } = await api.get('/plants', { params });
+    const { data } = await client.get('/plants', { params });
     return data;
   },
 
   getOne: async (id: number): Promise<PlantWithEvents> => {
-    const { data } = await api.get(`/plants/${id}`);
+    const { data } = await client.get(`/plants/${id}`);
     return data;
   },
 
@@ -26,17 +24,17 @@ export const plantsApi = {
     id: number,
     payload: { to_container_id: number; to_cell_index?: number; notes?: string }
   ): Promise<Plant> => {
-    const { data } = await api.put(`/plants/${id}/transplant`, payload);
+    const { data } = await client.put(`/plants/${id}/transplant`, payload);
     return data;
   },
 
   setStatus: async (id: number, status: Plant['status']): Promise<Plant> => {
-    const { data } = await api.put(`/plants/${id}/status`, { status });
+    const { data } = await client.put(`/plants/${id}/status`, { status });
     return data;
   },
 
   markGerminated: async (id: number): Promise<Plant> => {
-    const { data } = await api.put(`/plants/${id}/status`, { status: 'growing' });
+    const { data } = await client.put(`/plants/${id}/status`, { status: 'growing' });
     return data;
   },
 
@@ -44,11 +42,11 @@ export const plantsApi = {
     id: number,
     payload: { event_type: string; event_date?: string; notes: string }
   ): Promise<PlantEvent> => {
-    const { data } = await api.post(`/plants/${id}/events`, payload);
+    const { data } = await client.post(`/plants/${id}/events`, payload);
     return data;
   },
 
   remove: async (id: number): Promise<void> => {
-    await api.delete(`/plants/${id}`);
+    await client.delete(`/plants/${id}`);
   },
 };

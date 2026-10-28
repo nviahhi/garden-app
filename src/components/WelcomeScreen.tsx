@@ -1,0 +1,138 @@
+import { useState } from 'react';
+import { AuthModal } from './AuthModal';
+
+interface WelcomeScreenProps {
+  onStart: () => void;
+  onDemo: () => Promise<void>;
+}
+
+export function WelcomeScreen({ onStart, onDemo }: WelcomeScreenProps) {
+  const [authModal, setAuthModal] = useState<'login' | 'signup' | null>(null);
+  const [demoLoading, setDemoLoading] = useState(false);
+
+  const handleDemo = async () => {
+    setDemoLoading(true);
+    try {
+      await onDemo();
+    } finally {
+      setDemoLoading(false);
+    }
+  };
+
+  return (
+    <div className="welcome">
+      <div className="welcome-content">
+        <div className="welcome-icon">🌱</div>
+        <h1>Журнал рассады</h1>
+        <p className="welcome-subtitle">
+          Личный учёт растений — от семечка до урожая. Создавайте зоны,
+          добавляйте контейнеры, следите за каждым ростком, ведите историю
+          пересадок и получайте статистику по сезону.
+        </p>
+
+        <div className="welcome-features">
+          <div className="welcome-feature">
+            <span className="welcome-feature-icon">🗄️</span>
+            <div>
+              <strong>Стеллаж, подоконник, огород</strong>
+              <p>Разные зоны со своим масштабом, полками и контейнерами</p>
+            </div>
+          </div>
+
+          <div className="welcome-feature">
+            <span className="welcome-feature-icon">🌱</span>
+            <div>
+              <strong>Каждое растение под контролем</strong>
+              <p>
+                Сквозной номер, история статусов и пересадок,
+                фотографии роста
+              </p>
+            </div>
+          </div>
+
+          <div className="welcome-feature">
+            <span className="welcome-feature-icon">📊</span>
+            <div>
+              <strong>Статистика и экспорт</strong>
+              <p>
+                Всхожесть по сортам, распределение по статусам,
+                поиск и PDF-отчёты
+              </p>
+            </div>
+          </div>
+
+          <div className="welcome-feature">
+            <span className="welcome-feature-icon">✍️</span>
+            <div>
+              <strong>Заметки и наблюдения</strong>
+              <p>
+                Фиксируйте, что растёт лучше, что болеет, что стоит
+                повторить в следующем сезоне
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="welcome-actions">
+          <button
+            className="welcome-btn welcome-btn-primary"
+            onClick={onStart}
+          >
+            <span className="welcome-btn-title">Начать со своих данных</span>
+            <span className="welcome-btn-hint">
+              Создайте первую зону и контейнеры
+            </span>
+          </button>
+
+          <button
+            className="welcome-btn welcome-btn-secondary"
+            onClick={handleDemo}
+            disabled={demoLoading}
+          >
+            <span className="welcome-btn-title">
+              {demoLoading ? '⏳ Загружаю...' : '✨ Посмотреть на демо-данных'}
+            </span>
+            <span className="welcome-btn-hint">
+              3 зоны, 7 контейнеров, готовые растения
+            </span>
+          </button>
+        </div>
+
+        <div className="welcome-footer">
+          <button
+            className="welcome-link"
+            onClick={() => setAuthModal('login')}
+          >
+            Уже есть аккаунт? Войти
+          </button>
+          <span className="welcome-footer-sep">·</span>
+          <button
+            className="welcome-link"
+            onClick={() => setAuthModal('signup')}
+          >
+            Сразу создать аккаунт
+          </button>
+        </div>
+
+        <div className="welcome-contact">
+          <span className="welcome-contact-text">
+            Идеи, пожелания и баг-репорты —{' '}
+          </span>
+          <a
+            className="welcome-contact-link"
+            href="mailto:nadja.viahhi@gmail.com?subject=Журнал%20рассады"
+          >
+            nadja.viahhi@gmail.com
+          </a>
+        </div>
+      </div>
+
+      {authModal && (
+        <AuthModal
+          initialMode={authModal}
+          onClose={() => setAuthModal(null)}
+        />
+      )}
+    </div>
+  );
+}

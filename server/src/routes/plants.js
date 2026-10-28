@@ -2,13 +2,13 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db');
 
-// GET /api/plants — список растений с фильтрами
+// GET /api/plants — с фильтрами
 router.get('/', async (req, res) => {
   try {
     const { container_id, batch_id, status } = req.query;
 
-    const conditions = [];
-    const params = [];
+    const conditions = ['p.user_id = $1'];
+    const params = [req.user.id];
 
     if (container_id) {
       params.push(container_id);
@@ -23,16 +23,13 @@ router.get('/', async (req, res) => {
       conditions.push(`p.status = $${params.length}`);
     }
 
-    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    const where = `WHERE ${conditions.join(' AND ')}`;
 
     const result = await pool.query(`
       SELECT 
         p.*,
-        b.species,
-        b.variety,
-        b.sowing_date,
-        c.name AS container_name,
-        c.type AS container_type
+        b.species, b.variety, b.sowing_date,
+        c.name AS container_name, c.type AS container_type
       FROM plants p
       JOIN batches b ON b.id = p.batch_id
       LEFT JOIN containers c ON c.id = p.container_id
@@ -47,7 +44,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-// GET /api/plants/:id — одно растение с историей
+// GET /api/plants/:id — с историей
 router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -58,8 +55,8 @@ router.get('/:id', async (req, res) => {
       FROM plants p
       JOIN batches b ON b.id = p.batch_id
       LEFT JOIN containers c ON c.id = p.container_id
-      WHERE p.id = $1
-    `, [id]);
+      WHERE p.id = $1 AND p.user_id = $2
+    `, [id, req.user.id]);
 
     if (plantResult.rows.length === 0) {
       return res.status(404).json({ error: 'Растение не найдено' });
@@ -76,21 +73,18 @@ router.get('/:id', async (req, res) => {
       LEFT JOIN containers tc ON tc.id = e.to_container_id
       LEFT JOIN zones fz ON fz.id = fc.zone_id
       LEFT JOIN zones tz ON tz.id = tc.zone_id
-      WHERE e.plant_id = $1
+      WHERE e.plant_id = $1 AND e.user_id = $2
       ORDER BY e.event_date DESC, e.id DESC
-    `, [id]);
+    `, [id, req.user.id]);
 
-    res.json({
-      ...plantResult.rows[0],
-      events: eventsResult.rows,
-    });
+    res.json({ ...plantResult.rows[0], events: eventsResult.rows });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Ошибка получения растения' });
   }
 });
 
-// POST /api/plants — создать одно растение вручную
+// POST /api/plants — создать вручную
 router.post('/', async (req, res) => {
   try {
     const { batch_id, container_id, cell_index, number, status, notes } = req.body;
@@ -99,17 +93,28 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Обязательные поля: batch_id, number' });
     }
 
+    const batchCheck = await pool.query(
+      'SELECT id FROM batches WHERE id = $1 AND user_id = $2',
+      [batch_id, req.user.id]
+    );
+    if (batchCheck.rows.length === 0) {
+      return res.status(403).json({ error: 'Партия недоступна' });
+    }
+
+    // Сквозной номер в рамках юзера
+    const maxRes = await pool.query(
+      'SELECT COALESCE(MAX(display_number), 0)::int AS max FROM plants WHERE user_id = $1',
+      [req.user.id]
+    );
+    const displayNumber = maxRes.rows[0].max + 1;
+
     const result = await pool.query(`
-      INSERT INTO plants (batch_id, container_id, cell_index, number, status, notes, display_number)
-      VALUES ($1, $2, $3, $4, $5, $6, nextval('plants_display_number_seq'))
+      INSERT INTO plants (batch_id, container_id, cell_index, number, status, notes, display_number, user_id)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       RETURNING *
     `, [
-      batch_id,
-      container_id || null,
-      cell_index ?? null,
-      number,
-      status || 'sown',
-      notes || null,
+      batch_id, container_id || null, cell_index ?? null, number,
+      status || 'sown', notes || null, displayNumber, req.user.id,
     ]);
 
     res.status(201).json(result.rows[0]);
@@ -119,7 +124,7 @@ router.post('/', async (req, res) => {
   }
 });
 
-// PUT /api/plants/:id/transplant — пересадка растения
+// PUT /api/plants/:id/transplant
 router.put('/:id/transplant', async (req, res) => {
   const client = await pool.connect();
 
@@ -134,79 +139,71 @@ router.put('/:id/transplant', async (req, res) => {
       return res.status(400).json({ error: 'Поле to_container_id обязательно' });
     }
 
-    // Текущее состояние растения
     const currentResult = await client.query(
-      'SELECT * FROM plants WHERE id = $1',
-      [id]
+      'SELECT * FROM plants WHERE id = $1 AND user_id = $2',
+      [id, req.user.id]
     );
-
     if (currentResult.rows.length === 0) {
       await client.query('ROLLBACK');
       return res.status(404).json({ error: 'Растение не найдено' });
     }
-
     const current = currentResult.rows[0];
 
-    // ===== Определяем финальный cell_index =====
+    // Проверка целевого контейнера
+    const targetContainerResult = await client.query(
+      'SELECT * FROM containers WHERE id = $1 AND user_id = $2',
+      [to_container_id, req.user.id]
+    );
+    if (targetContainerResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(403).json({ error: 'Контейнер недоступен' });
+    }
+    const container = targetContainerResult.rows[0];
+
     let finalCellIndex = to_cell_index ?? null;
 
-    if (finalCellIndex == null) {
-      const targetContainer = await client.query(
-        'SELECT * FROM containers WHERE id = $1',
-        [to_container_id]
-      );
+    // Автоподбор свободной ячейки
+    if (finalCellIndex == null && container.cols && container.rows) {
+      const totalCells = container.cols * container.rows;
 
-      const container = targetContainer.rows[0];
-      const hasGrid = container?.cols && container?.rows;
+      const occupied = await client.query(`
+        SELECT cell_index FROM plants
+        WHERE container_id = $1 AND user_id = $2 AND cell_index IS NOT NULL AND id != $3
+      `, [to_container_id, req.user.id, id]);
 
-      if (hasGrid) {
-        const totalCells = container.cols * container.rows;
+      const occupiedSet = new Set(occupied.rows.map((r) => r.cell_index));
 
-        const occupied = await client.query(`
-          SELECT cell_index FROM plants
-          WHERE container_id = $1 AND cell_index IS NOT NULL AND id != $2
-        `, [to_container_id, id]);
-
-        const occupiedSet = new Set(occupied.rows.map((r) => r.cell_index));
-
-        let freeCell = null;
-        for (let i = 0; i < totalCells; i++) {
-          if (!occupiedSet.has(i)) {
-            freeCell = i;
-            break;
-          }
+      let freeCell = null;
+      for (let i = 0; i < totalCells; i++) {
+        if (!occupiedSet.has(i)) {
+          freeCell = i;
+          break;
         }
-
-        if (freeCell == null) {
-          await client.query('ROLLBACK');
-          return res.status(400).json({
-            error: 'В этой кассете нет свободных ячеек',
-          });
-        }
-
-        finalCellIndex = freeCell;
       }
-    } else {
-      // Пользователь указал ячейку явно — проверяем занятость
+
+      if (freeCell == null) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: 'В этой кассете нет свободных ячеек' });
+      }
+      finalCellIndex = freeCell;
+    } else if (finalCellIndex != null) {
       const conflict = await client.query(`
         SELECT id FROM plants
-        WHERE container_id = $1 AND cell_index = $2 AND id != $3
-      `, [to_container_id, finalCellIndex, id]);
+        WHERE container_id = $1 AND user_id = $2 AND cell_index = $3 AND id != $4
+      `, [to_container_id, req.user.id, finalCellIndex, id]);
 
       if (conflict.rows.length > 0) {
         await client.query('ROLLBACK');
-        return res.status(400).json({
-          error: `Ячейка #${finalCellIndex + 1} уже занята`,
-        });
+        return res.status(400).json({ error: `Ячейка #${finalCellIndex + 1} уже занята` });
       }
     }
 
-    // ===== Пишем событие пересадки =====
+    // Событие пересадки
     await client.query(`
       INSERT INTO plant_events 
         (plant_id, event_type, event_date, from_container_id, from_cell_index,
-         to_container_id, to_cell_index, notes)
-      VALUES ($1, 'transplant', CURRENT_DATE, $2, $3, $4, $5, $6)
+         to_container_id, to_cell_index, notes, user_id)
+      VALUES ($1, 'transplant', CURRENT_DATE, $2, $3, $4, $5, $6, $7)
     `, [
       id,
       current.container_id,
@@ -214,21 +211,17 @@ router.put('/:id/transplant', async (req, res) => {
       to_container_id,
       finalCellIndex,
       notes || null,
+      req.user.id,
     ]);
 
-    // ===== Обновляем растение =====
     await client.query(`
       UPDATE plants
-      SET container_id = $1,
-          cell_index = $2,
-          updated_at = NOW()
-      WHERE id = $3
-    `, [to_container_id, finalCellIndex, id]);
+      SET container_id = $1, cell_index = $2, updated_at = NOW()
+      WHERE id = $3 AND user_id = $4
+    `, [to_container_id, finalCellIndex, id, req.user.id]);
 
-    // Читаем с JOIN, чтобы вернуть актуальные container_name / container_type
     const fullResult = await client.query(`
-      SELECT p.*, 
-             b.species, b.variety, b.sowing_date,
+      SELECT p.*, b.species, b.variety, b.sowing_date,
              c.name AS container_name, c.type AS container_type
       FROM plants p
       JOIN batches b ON b.id = p.batch_id
@@ -237,7 +230,6 @@ router.put('/:id/transplant', async (req, res) => {
     `, [id]);
 
     await client.query('COMMIT');
-
     res.json(fullResult.rows[0]);
   } catch (err) {
     await client.query('ROLLBACK');
@@ -248,7 +240,7 @@ router.put('/:id/transplant', async (req, res) => {
   }
 });
 
-// PUT /api/plants/:id/status — сменить статус растения
+// PUT /api/plants/:id/status
 router.put('/:id/status', async (req, res) => {
   const client = await pool.connect();
 
@@ -267,18 +259,15 @@ router.put('/:id/status', async (req, res) => {
     }
 
     const currentResult = await client.query(
-      'SELECT * FROM plants WHERE id = $1',
-      [id]
+      'SELECT * FROM plants WHERE id = $1 AND user_id = $2',
+      [id, req.user.id]
     );
-
     if (currentResult.rows.length === 0) {
       await client.query('ROLLBACK');
       return res.status(404).json({ error: 'Растение не найдено' });
     }
-
     const current = currentResult.rows[0];
 
-    // Если статус не меняется — ничего не пишем
     if (current.status === status) {
       await client.query('ROLLBACK');
       return res.json(current);
@@ -287,18 +276,17 @@ router.put('/:id/status', async (req, res) => {
     const updatedResult = await client.query(`
       UPDATE plants
       SET status = $1, updated_at = NOW()
-      WHERE id = $2
+      WHERE id = $2 AND user_id = $3
       RETURNING *
-    `, [status, id]);
+    `, [status, id, req.user.id]);
 
     await client.query(`
       INSERT INTO plant_events 
-        (plant_id, event_type, event_date, from_status, to_status, notes)
-      VALUES ($1, 'status_change', CURRENT_DATE, $2, $3, NULL)
-    `, [id, current.status, status]);
+        (plant_id, event_type, event_date, from_status, to_status, notes, user_id)
+      VALUES ($1, 'status_change', CURRENT_DATE, $2, $3, NULL, $4)
+    `, [id, current.status, status, req.user.id]);
 
     await client.query('COMMIT');
-
     res.json(updatedResult.rows[0]);
   } catch (err) {
     await client.query('ROLLBACK');
@@ -309,7 +297,7 @@ router.put('/:id/status', async (req, res) => {
   }
 });
 
-// POST /api/plants/:id/events — добавить событие (заметка, замер)
+// POST /api/plants/:id/events
 router.post('/:id/events', async (req, res) => {
   try {
     const { id } = req.params;
@@ -319,11 +307,19 @@ router.post('/:id/events', async (req, res) => {
       return res.status(400).json({ error: 'Обязательные поля: event_type, notes' });
     }
 
+    const plantCheck = await pool.query(
+      'SELECT id FROM plants WHERE id = $1 AND user_id = $2',
+      [id, req.user.id]
+    );
+    if (plantCheck.rows.length === 0) {
+      return res.status(403).json({ error: 'Растение недоступно' });
+    }
+
     const result = await pool.query(`
-      INSERT INTO plant_events (plant_id, event_type, event_date, notes)
-      VALUES ($1, $2, $3, $4)
+      INSERT INTO plant_events (plant_id, event_type, event_date, notes, user_id)
+      VALUES ($1, $2, $3, $4, $5)
       RETURNING *
-    `, [id, event_type, event_date || new Date(), notes]);
+    `, [id, event_type, event_date || new Date(), notes, req.user.id]);
 
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -332,13 +328,13 @@ router.post('/:id/events', async (req, res) => {
   }
 });
 
-// DELETE /api/plants/:id — удалить растение
+// DELETE /api/plants/:id
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const result = await pool.query(
-      'DELETE FROM plants WHERE id = $1 RETURNING *',
-      [id]
+      'DELETE FROM plants WHERE id = $1 AND user_id = $2 RETURNING *',
+      [id, req.user.id]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Растение не найдено' });

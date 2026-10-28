@@ -14,17 +14,27 @@ import { ZoneSwitcher } from './components/ZoneSwitcher';
 import { ZoneModal } from './components/ZoneModal';
 import { PlantSearch } from './components/PlantSearch';
 import { StatsDashboard } from './components/StatsDashboard';
+import { WelcomeScreen } from './components/WelcomeScreen';
+import { GuestBanner } from './components/GuestBanner';
+import { demoApi } from './api/demo';
 import { exportApi } from './api/export';
 import { exportPlantsToPdf } from './utils/pdfExport';
 import { useContainerStore } from './store/useContainerStore';
 import { useBatchStore } from './store/useBatchStore';
 import { useZoneStore } from './store/useZoneStore';
+import { useAuthStore } from './store/useAuthStore';
 import type { Plant, Batch } from './types';
 
 type SidebarTab = 'containers' | 'batches';
 type ZoneModalState = { mode: 'create' } | { mode: 'edit'; zoneId: number } | null;
 
+const WELCOME_SEEN_KEY = 'garden-welcome-seen';
+
 function App() {
+  // ===== Auth =====
+  const { user, isLoading: authLoading, init } = useAuthStore();
+
+  // ===== Данные =====
   const containers = useContainerStore((s) => s.containers);
   const loadContainers = useContainerStore((s) => s.loadContainers);
 
@@ -39,38 +49,46 @@ function App() {
   const loadZones = useZoneStore((s) => s.loadZones);
   const selectZone = useZoneStore((s) => s.selectZone);
 
+  // ===== UI state =====
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>('containers');
-
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [selectedPlant, setSelectedPlant] = useState<Plant | null>(null);
   const [selectedBatch, setSelectedBatch] = useState<Batch | null>(null);
   const [germinateBatch, setGerminateBatch] = useState<Batch | null>(null);
   const [transplantPlant, setTransplantPlant] = useState<Plant | null>(null);
-
   const [isCreateContainerOpen, setCreateContainerOpen] = useState(false);
   const [isCreateBatchOpen, setCreateBatchOpen] = useState(false);
   const [isSearchOpen, setSearchOpen] = useState(false);
+  const [isStatsOpen, setStatsOpen] = useState(false);
   const [zoneModal, setZoneModal] = useState<ZoneModalState>(null);
   const [exportingAll, setExportingAll] = useState(false);
-  const [isStatsOpen, setStatsOpen] = useState(false);
+  const [resettingDemo, setResettingDemo] = useState(false);
+  const [welcomeSeen, setWelcomeSeen] = useState(
+    localStorage.getItem(WELCOME_SEEN_KEY) === 'true'
+  );
 
+  // ===== Auth init (создаст гостя, если нужно) =====
   useEffect(() => {
+    init();
+  }, [init]);
+
+  // ===== Загрузка данных после auth =====
+  useEffect(() => {
+    if (!user) return;
     loadZones();
-  }, [loadZones]);
-
-  useEffect(() => {
     loadContainers();
     loadBatches();
     loadPlants();
-  }, [loadContainers, loadBatches, loadPlants]);
+  }, [user, loadZones, loadContainers, loadBatches, loadPlants]);
 
+  // ===== История выбранного растения =====
   useEffect(() => {
     if (selectedPlant) {
       loadPlantWithEvents(selectedPlant.id);
     }
   }, [selectedPlant, loadPlantWithEvents]);
 
-  // Cmd+K / Ctrl+K — открыть поиск
+  // ===== Cmd+K / Ctrl+K — открыть поиск =====
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
@@ -82,6 +100,7 @@ function App() {
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
+  // ===== Derived =====
   const zoneContainers = useMemo(
     () => containers.filter((c) => c.zone_id === currentZone?.id),
     [containers, currentZone]
@@ -90,7 +109,7 @@ function App() {
   const selectedContainer =
     zoneContainers.find((c) => c.id === selectedId) ?? null;
 
-  // ===== Подсветка контейнеров по выбранной партии =====
+  // Подсветка контейнеров по выбранной партии
   const highlightedContainerIds = useMemo(() => {
     if (!selectedBatch) return new Set<number>();
     const ids = new Set<number>();
@@ -106,7 +125,7 @@ function App() {
     return ids;
   }, [selectedBatch, plants]);
 
-  // ===== Подсветка контейнера, если у выбранного растения нет маркера =====
+  // Подсветка контейнера, если у выбранного растения нет маркера
   const selectedPlantHighlightIds = useMemo(() => {
     const ids = new Set<number>();
     if (!selectedPlant) return ids;
@@ -144,6 +163,9 @@ function App() {
     return merged;
   }, [highlightedContainerIds, selectedPlantHighlightIds]);
 
+  const hasDemo = zones.some((z) => z.is_demo);
+
+  // ===== Handlers =====
   const handlePlantClick = (plant: Plant) => {
     setSelectedPlant(plant);
     setSelectedBatch(null);
@@ -168,7 +190,6 @@ function App() {
     setSelectedPlant(null);
   };
 
-  // ===== Экспорт ВСЕГО в PDF =====
   const handleExportAll = async () => {
     setExportingAll(true);
     try {
@@ -189,8 +210,87 @@ function App() {
     }
   };
 
+  const handleResetDemo = async () => {
+    if (
+      !confirm(
+        'Удалить демо-данные? Все демо-зоны и растения будут удалены.'
+      )
+    ) {
+      return;
+    }
+    setResettingDemo(true);
+    try {
+      await demoApi.reset();
+      await loadZones();
+      await loadContainers();
+      await loadBatches();
+      await loadPlants();
+    } catch (err) {
+      console.error(err);
+      alert('Не удалось удалить демо-данные');
+    } finally {
+      setResettingDemo(false);
+    }
+  };
+
+  const dismissWelcome = () => {
+    localStorage.setItem(WELCOME_SEEN_KEY, 'true');
+    setWelcomeSeen(true);
+  };
+
+  const handleStartFromScratch = () => {
+    dismissWelcome();
+    setZoneModal({ mode: 'create' });
+  };
+
+  const handleStartWithDemo = async () => {
+    try {
+      await demoApi.seed();
+      await loadZones();
+      await loadContainers();
+      await loadBatches();
+      await loadPlants();
+      dismissWelcome();
+    } catch (err) {
+      console.error(err);
+      alert('Не удалось загрузить демо-данные');
+    }
+  };
+
+  // ===== Loading =====
+  if (authLoading) {
+    return (
+      <div className="app-loading">
+        <div className="app-loading-spinner" />
+        <p>Загрузка...</p>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="app-loading">
+        <p>Не удалось инициализировать сессию. Обновите страницу.</p>
+      </div>
+    );
+  }
+
+  // ===== Welcome screen =====
+  if (!welcomeSeen && zones.length === 0) {
+    return (
+      <WelcomeScreen
+        onStart={handleStartFromScratch}
+        onDemo={handleStartWithDemo}
+      />
+    );
+  }
+
+  // ===== Приложение =====
   return (
-    <div className="app-layout">
+    <div className="app-root">
+      <GuestBanner />
+
+      <div className="app-layout">
       {sidebarTab === 'containers' ? (
         <ContainerList
           selectedId={selectedId}
@@ -231,7 +331,7 @@ function App() {
             onClick={() => setSearchOpen(true)}
             title="Поиск растений (Cmd/Ctrl+K)"
           >
-            🔍 Поиск
+            🔍 Поиск <kbd>⌘K</kbd>
           </button>
 
           <button
@@ -250,6 +350,17 @@ function App() {
           >
             📊 Статистика
           </button>
+
+          {hasDemo && (
+            <button
+              className="btn btn-ghost"
+              onClick={handleResetDemo}
+              disabled={resettingDemo}
+              title="Удалить демо-данные"
+            >
+              {resettingDemo ? '⏳ Удаляю...' : '🔄 Сбросить демо'}
+            </button>
+          )}
         </div>
 
         <GardenCanvas
@@ -304,10 +415,6 @@ function App() {
         <BatchCreateModal onClose={() => setCreateBatchOpen(false)} />
       )}
 
-      {isStatsOpen && (
-        <StatsDashboard onClose={() => setStatsOpen(false)} />
-      )}
-
       {germinateBatch && (
         <GerminateModal
           batch={germinateBatch}
@@ -338,6 +445,10 @@ function App() {
         />
       )}
 
+      {isStatsOpen && (
+        <StatsDashboard onClose={() => setStatsOpen(false)} />
+      )}
+
       {zoneModal && (
         <ZoneModal
           mode={zoneModal.mode}
@@ -348,6 +459,7 @@ function App() {
           }}
         />
       )}
+      </div>
     </div>
   );
 }

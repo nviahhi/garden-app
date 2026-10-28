@@ -34,11 +34,26 @@ export function BatchInfoPanel({
   const sownCount = batchPlants.filter((p) => p.status === 'sown').length;
   const germinatedCount = batchPlants.filter((p) => p.status !== 'sown').length;
 
-  const canCreatePlants = plantsCount === 0 && batch.seeds_count > 0 && batch.container_id != null;
+  // ===== Ключевой фикс =====
+  // Сколько семян ещё не отмечено как взошедшие
+  const remaining = Math.max(0, batch.seeds_count - plantsCount);
+
+  // Кнопку «Отметить / Добавить ещё» показываем, пока есть непокрытые семена
+  // и у партии есть контейнер (россыпь в контейнере/плошке)
+  const canCreatePlants = remaining > 0 && batch.container_id != null;
+
+  // «Отметить всех взошедшими» — только если есть sown (для посадки по ячейкам
+  // или горшкам, где растения уже созданы, но не отмечены)
   const canMarkGerminated = sownCount > 0;
 
   const handleDelete = async () => {
-    if (confirm(`Удалить партию «${batch.species}${batch.variety ? ' ' + batch.variety : ''}»?`)) {
+    if (
+      confirm(
+        `Удалить партию «${batch.species}${
+          batch.variety ? ' · ' + batch.variety : ''
+        }»?`
+      )
+    ) {
       await removeBatch(batch.id);
       onClose();
     }
@@ -48,11 +63,19 @@ export function BatchInfoPanel({
     await markGerminated(batch.id);
   };
 
+  // Текст кнопки зависит от состояния
+  const germinateLabel =
+    plantsCount === 0
+      ? '🌱 Отметить всходы'
+      : `🌱 Добавить ещё (${remaining})`;
+
   return (
     <aside className="edit-panel">
       <div className="panel-header">
         <h3>Партия</h3>
-        <button className="btn-icon" onClick={onClose} aria-label="Закрыть">×</button>
+        <button className="btn-icon" onClick={onClose} aria-label="Закрыть">
+          ×
+        </button>
       </div>
 
       {siblings.length > 1 && (
@@ -68,7 +91,8 @@ export function BatchInfoPanel({
                   onClick={() => onSelectBatch(b)}
                 >
                   <span className="batch-switcher-name">
-                    {b.species}{b.variety ? ` · ${b.variety}` : ''}
+                    {b.species}
+                    {b.variety ? ` · ${b.variety}` : ''}
                   </span>
                   <span className="batch-switcher-meta">
                     🌰 {b.seeds_count} · {bPlants} раст.
@@ -95,25 +119,38 @@ export function BatchInfoPanel({
         </div>
         <div className="batch-card-row">
           <span className="batch-label">Контейнер:</span>
-          <span>{batch.container_name ?? (batch.container_id === null ? 'группа горшков' : '—')}</span>
+          <span>
+            {batch.container_name ??
+              (batch.container_id === null ? 'группа горшков' : '—')}
+          </span>
         </div>
         {batchPlants.length > 0 && (
           <div className="batch-card-row">
             <span className="batch-label">Взошло:</span>
-            <span>{germinatedCount} из {batch.seeds_count}</span>
+            <span>
+              {germinatedCount} из {batch.seeds_count}
+            </span>
           </div>
         )}
-        {batch.notes && (
-          <div className="batch-card-notes">{batch.notes}</div>
-        )}
+        {batch.notes && <div className="batch-card-notes">{batch.notes}</div>}
       </div>
 
+      {/* Отметить / добавить всходы — пока есть непокрытые семена */}
       {canCreatePlants && (
         <button className="btn btn-primary" onClick={() => onGerminate(batch)}>
-          🌱 Отметить всходы
+          {germinateLabel}
         </button>
       )}
 
+      {/* Все семена уже отмечены */}
+      {!canCreatePlants && batch.container_id != null && plantsCount > 0 && (
+        <p className="muted" style={{ textAlign: 'center', fontSize: 12 }}>
+          Все {batch.seeds_count}{' '}
+          {batch.seeds_count === 1 ? 'семя отмечено' : 'семян отмечены'}
+        </p>
+      )}
+
+      {/* Отметить всех взошедшими (для sown из ячеек/горшков) */}
       {canMarkGerminated && (
         <button className="btn btn-primary" onClick={handleMarkGerminated}>
           🌱 Отметить всех взошедшими ({sownCount})
@@ -142,7 +179,10 @@ export function BatchInfoPanel({
                   <span className="batch-plant-num">
                     #{p.display_number ?? p.number}
                     {p.container_name && (
-                      <span className="batch-plant-container"> · {p.container_name}</span>
+                      <span className="batch-plant-container">
+                        {' '}
+                        · {p.container_name}
+                      </span>
                     )}
                   </span>
                   <span className="batch-plant-status">

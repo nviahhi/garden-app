@@ -7,16 +7,18 @@ router.get('/plants', async (req, res) => {
   try {
     const { zone_id, batch_id } = req.query;
 
-    let where = '';
-    const params = [];
+    const conditions = ['p.user_id = $1'];
+    const params = [req.user.id];
 
     if (batch_id) {
       params.push(batch_id);
-      where = `WHERE p.batch_id = $${params.length}`;
+      conditions.push(`p.batch_id = $${params.length}`);
     } else if (zone_id) {
       params.push(zone_id);
-      where = `WHERE c.zone_id = $${params.length}`;
+      conditions.push(`c.zone_id = $${params.length}`);
     }
+
+    const where = `WHERE ${conditions.join(' AND ')}`;
 
     const result = await pool.query(`
       SELECT 
@@ -42,9 +44,9 @@ router.get('/plants', async (req, res) => {
         FROM plant_events e
         LEFT JOIN containers fc ON fc.id = e.from_container_id
         LEFT JOIN containers tc ON tc.id = e.to_container_id
-        WHERE e.plant_id = ANY($1::int[])
+        WHERE e.plant_id = ANY($1::int[]) AND e.user_id = $2
         ORDER BY e.event_date ASC, e.id ASC
-      `, [plantIds]);
+      `, [plantIds, req.user.id]);
 
       for (const ev of eventsResult.rows) {
         if (!eventsByPlant[ev.plant_id]) eventsByPlant[ev.plant_id] = [];
@@ -53,10 +55,7 @@ router.get('/plants', async (req, res) => {
     }
 
     res.json(
-      result.rows.map((p) => ({
-        ...p,
-        events: eventsByPlant[p.id] ?? [],
-      }))
+      result.rows.map((p) => ({ ...p, events: eventsByPlant[p.id] ?? [] }))
     );
   } catch (err) {
     console.error(err);

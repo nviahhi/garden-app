@@ -1,18 +1,16 @@
-import axios from 'axios';
+import client from './client';
 import type { Plant } from '../types';
 
-const api = axios.create({ baseURL: '/api' });
-
 export const exportApi = {
-  // Все растения (все зоны, все партии)
+  // Все растения всех зон и партий
   plantsAll: async (): Promise<Plant[]> => {
-    const { data } = await api.get('/export/plants');
+    const { data } = await client.get('/export/plants');
     return data;
   },
 
   // Растения конкретной зоны
   plantsByZone: async (zoneId: number): Promise<Plant[]> => {
-    const { data } = await api.get('/export/plants', {
+    const { data } = await client.get('/export/plants', {
       params: { zone_id: zoneId },
     });
     return data;
@@ -20,7 +18,7 @@ export const exportApi = {
 
   // Растения конкретной партии
   plantsByBatch: async (batchId: number): Promise<Plant[]> => {
-    const { data } = await api.get('/export/plants', {
+    const { data } = await client.get('/export/plants', {
       params: { batch_id: batchId },
     });
     return data;

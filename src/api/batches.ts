@@ -1,7 +1,5 @@
-import axios from 'axios';
+import client from './client';
 import type { Batch, Plant } from '../types';
-
-const api = axios.create({ baseURL: '/api' });
 
 export interface CreateBatchPayload {
   species: string;
@@ -10,7 +8,7 @@ export interface CreateBatchPayload {
   seeds_count: number;
   container_id?: number;
   cell_indices?: number[];
-  container_ids?: number[];      // ← группа горшков
+  container_ids?: number[];
   notes?: string;
 }
 
@@ -20,31 +18,36 @@ export interface BatchWithPlants extends Batch {
 
 export const batchesApi = {
   getAll: async (): Promise<Batch[]> => {
-    const { data } = await api.get('/batches');
+    const { data } = await client.get('/batches');
     return data;
   },
 
   getOne: async (id: number): Promise<BatchWithPlants> => {
-    const { data } = await api.get(`/batches/${id}`);
+    const { data } = await client.get(`/batches/${id}`);
     return data;
   },
 
   create: async (payload: CreateBatchPayload): Promise<BatchWithPlants> => {
-    const { data } = await api.post('/batches', payload);
+    const { data } = await client.post('/batches', payload);
     return data;
   },
 
-  germinate: async (id: number, count: number): Promise<{ created: number; plants: Plant[] }> => {
-    const { data } = await api.post(`/batches/${id}/germinate`, { count });
+  germinate: async (
+    id: number,
+    count: number
+  ): Promise<{ created: number; plants: Plant[] }> => {
+    const { data } = await client.post(`/batches/${id}/germinate`, { count });
     return data;
   },
 
-  markGerminated: async (id: number): Promise<{ updated: number; plants: Plant[] }> => {
-    const { data } = await api.put(`/batches/${id}/mark-germinated`);
+  markGerminated: async (
+    id: number
+  ): Promise<{ updated: number; plants: Plant[] }> => {
+    const { data } = await client.put(`/batches/${id}/mark-germinated`);
     return data;
   },
 
   remove: async (id: number): Promise<void> => {
-    await api.delete(`/batches/${id}`);
+    await client.delete(`/batches/${id}`);
   },
 };
