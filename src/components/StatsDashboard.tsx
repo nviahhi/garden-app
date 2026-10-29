@@ -72,12 +72,9 @@ export function StatsDashboard({ onClose }: StatsDashboardProps) {
 
   const { totals, bySpecies, bySpeciesLocation, byZone, topContainers } = stats;
 
-  const totalPlants = totals.plants || 1;
-  const germinated = STATUS_ORDER.filter((s) => s !== 'sown').reduce(
-    (sum, s) => sum + totals.byStatus[s],
-    0
-  );
-  const germinationRate = Math.round((germinated / totalPlants) * 100);
+  const totalSeeds = totals.total_seeds || 1;
+  const germinated = totals.germinated ?? 0;
+  const germinationRate = Math.round((germinated / totalSeeds) * 100);
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -106,7 +103,7 @@ export function StatsDashboard({ onClose }: StatsDashboardProps) {
                 {germinationRate}%
               </div>
               <div className="kpi-sub">
-                {germinated} из {totals.plants} взошли
+                  {germinated} из {totals.total_seeds} семян взошли
               </div>
             </div>
 

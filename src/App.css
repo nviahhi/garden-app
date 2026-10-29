@@ -18,7 +18,8 @@ button {
 .app-layout {
   display: grid;
   grid-template-columns: 260px 1fr auto;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
 }
 
 /* === Sidebar === */
@@ -88,6 +89,9 @@ button {
 
 /* === Canvas area === */
 .canvas-area {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
   padding: 16px;
   overflow: hidden;
   background: #f5f5f0;
@@ -290,7 +294,6 @@ button {
 .canvas-toolbar {
   display: flex;
   gap: 8px;
-  margin-bottom: 16px;
 }
 
 .radio-group {
@@ -844,7 +847,6 @@ button {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 12px;
   padding: 6px 8px;
   background: #f5f0e6;
   border-radius: 8px;
@@ -1190,8 +1192,8 @@ button {
 .canvas-wrapper {
   position: relative;
   width: 100%;
-  height: calc(100vh - 200px);
-  min-height: 500px;
+  flex: 1;
+  min-height: 0;
 }
 
 .canvas-container {
@@ -2398,19 +2400,16 @@ button {
 
 /* ===== Guest Banner ===== */
 .guest-banner {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 100;
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 20px;
+  padding: 10px 16px;
   background: #fff8e1;
-  border-bottom: 1px solid #ffcc80;
+  border: 1px solid #ffcc80;
+  border-radius: 8px;
   color: #bf6c00;
   font-size: 13px;
+  flex-wrap: wrap;
 }
 
 .guest-banner-icon {
@@ -2439,11 +2438,6 @@ button {
 
 .guest-banner-btn:hover {
   background: #a65a00;
-}
-
-/* Смещаем layout, если баннер есть */
-.guest-banner ~ .app-layout {
-  padding-top: 42px;
 }
 
 /* ===== Auth Modal ===== */
@@ -2481,4 +2475,76 @@ button {
   max-width: 320px;
   line-height: 1.5;
   margin: 0;
+}
+
+/* Топ-бар залогиненного пользователя */
+.user-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  background: #f0ede3;
+  border: 1px solid #e0d8c8;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #2e4a2e;
+}
+
+.user-bar-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.user-bar-email {
+  flex: 1;
+  min-width: 0;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-bar-logout {
+  padding: 4px 12px;
+  background: white;
+  border: 1px solid #d0c8b8;
+  border-radius: 6px;
+  color: #6b5b45;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
+  flex-shrink: 0;
+}
+
+.user-bar-logout:hover {
+  background: #fdecea;
+  border-color: #e57373;
+  color: #c62828;
+}
+
+/* Кнопка "Выйти" в гостевом баннере */
+.guest-banner-logout {
+  padding: 4px 10px;
+  background: transparent;
+  border: 1px solid #ffcc80;
+  border-radius: 6px;
+  color: #bf6c00;
+  font-size: 12px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+  flex-shrink: 0;
+}
+
+.guest-banner-logout:hover {
+  background: white;
+  border-color: #bf6c00;
 }

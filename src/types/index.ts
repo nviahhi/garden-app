@@ -174,6 +174,7 @@ export interface StatsTotals {
   zones: number;
   total_seeds: number;
   orphans: number;
+  germinated: number;  
   avg_age_days: number | null;
   byStatus: Record<PlantStatus, number>;
 }

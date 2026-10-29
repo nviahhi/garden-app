@@ -5,7 +5,13 @@ interface AuthState {
   user: AuthUser | null;
   token: string | null;
   isLoading: boolean;
+
+  /** Только читает сохранённый токен. НЕ создаёт гостя. */
   init: () => Promise<void>;
+
+  /** Создаёт гостя, если его ещё нет. Вызывается из welcome-кнопок. */
+  ensureGuest: () => Promise<void>;
+
   signup: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
@@ -13,40 +19,57 @@ interface AuthState {
 
 const TOKEN_KEY = 'garden-token';
 
-export const useAuthStore = create<AuthState>((set) => ({
+// Защита от двойного вызова init в StrictMode
+let initPromise: Promise<void> | null = null;
+
+export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   token: localStorage.getItem(TOKEN_KEY),
   isLoading: true,
 
-  init: async () => {
-    const token = localStorage.getItem(TOKEN_KEY);
+  init: () => {
+    // Уже идёт — вернуть тот же промис
+    if (initPromise) return initPromise;
 
-    // Нет токена → создаём гостя
-    if (!token) {
-      try {
-        const { token: t, user } = await authApi.guest();
-        localStorage.setItem(TOKEN_KEY, t);
-        set({ token: t, user, isLoading: false });
-      } catch (err) {
-        console.error('Ошибка создания гостя:', err);
+    // Уже инициализировано — ничего не делать
+    if (get().user && !get().isLoading) return Promise.resolve();
+
+    initPromise = (async () => {
+      const token = localStorage.getItem(TOKEN_KEY);
+
+      // Токена нет → НЕ создаём гостя, просто показываем welcome
+      if (!token) {
         set({ isLoading: false });
+        return;
       }
-      return;
-    }
 
-    // Есть токен → проверяем
-    try {
-      const user = await authApi.me();
-      set({ user, isLoading: false });
-    } catch {
-      // Токен протух → создаём нового гостя
+      // Токен есть → проверяем его валидность
       try {
-        const { token: t, user } = await authApi.guest();
-        localStorage.setItem(TOKEN_KEY, t);
-        set({ token: t, user, isLoading: false });
+        const user = await authApi.me();
+        set({ user, isLoading: false });
       } catch {
-        set({ isLoading: false });
+        // Токен протух / невалидный — забываем, показываем welcome
+        localStorage.removeItem(TOKEN_KEY);
+        set({ token: null, user: null, isLoading: false });
       }
+    })();
+
+    return initPromise;
+  },
+
+  ensureGuest: async () => {
+    // Гость (или аккаунт) уже есть — ничего не делаем
+    if (get().user) return;
+
+    try {
+      const { token, user } = await authApi.guest();
+      localStorage.setItem(TOKEN_KEY, token);
+      // Сбрасываем, чтобы следующий init() мог пересоздать при необходимости
+      initPromise = null;
+      set({ token, user, isLoading: false });
+    } catch (err) {
+      console.error('Ошибка создания гостя:', err);
+      throw err;
     }
   },
 
@@ -54,6 +77,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       const { token, user } = await authApi.signup(email, password);
       localStorage.setItem(TOKEN_KEY, token);
+      initPromise = null;
       set({ token, user });
       return { success: true };
     } catch (err) {
@@ -70,6 +94,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       const { token, user } = await authApi.login(email, password);
       localStorage.setItem(TOKEN_KEY, token);
+      initPromise = null;
       set({ token, user });
       return { success: true };
     } catch (err) {
@@ -84,8 +109,8 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   logout: () => {
     localStorage.removeItem(TOKEN_KEY);
+    initPromise = null;
     set({ user: null, token: null });
-    // Перезагружаем — init() создаст нового гостя
     window.location.reload();
   },
 }));

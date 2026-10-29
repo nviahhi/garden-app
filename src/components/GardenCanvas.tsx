@@ -133,12 +133,10 @@ export function GardenCanvas({
   onBatchClick,
   highlightedContainerIds,
 }: GardenCanvasProps) {
-  const { containers, isLoading, loadContainers } = useContainerStore();
+  const { containers, isLoading } = useContainerStore();
   const zone = useZoneStore((s) => s.currentZone);
   const plants = useBatchStore((s) => s.plants);
   const batches = useBatchStore((s) => s.batches);
-  const loadPlants = useBatchStore((s) => s.loadPlants);
-  const loadBatches = useBatchStore((s) => s.loadBatches);
   const transplantPlant = useBatchStore((s) => s.transplantPlant);
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -150,39 +148,41 @@ export function GardenCanvas({
 
   const scale = fitScale * zoom;
 
-  useEffect(() => {
-    loadContainers();
-    loadPlants();
-    loadBatches();
-  }, [loadContainers, loadPlants, loadBatches]);
+useEffect(() => {
+  // Ждём, пока контейнеры загрузятся — тогда canvas-wrapper точно смонтирован
+  if (isLoading) return;
+  if (!zone || !containerRef.current) return;
 
-  useEffect(() => {
-    if (!zone || !containerRef.current) return;
+  const el = containerRef.current;
 
-    const el = containerRef.current;
+  const updateFitScale = () => {
+      const w = el.clientWidth;
+      const h = el.clientHeight;
 
-    const updateFitScale = () => {
-      const availableWidth = el.clientWidth;
-      const availableHeight = el.clientHeight;
+      // Layout ещё не посчитан — не обнуляем scale в 0
+      if (w === 0 || h === 0) return;
 
       const padding = 32;
-      const maxW = availableWidth - padding;
-      const maxH = availableHeight - padding;
+      const maxW = w - padding;
+      const maxH = h - padding;
 
       const scaleX = maxW / zone.canvas_width;
       const scaleY = maxH / zone.canvas_height;
 
-      const newScale = Math.min(1, scaleX, scaleY);
-      setFitScale(newScale);
+      setFitScale(Math.min(1, scaleX, scaleY));
     };
 
-    updateFitScale();
+    // Первый расчёт — после следующего кадра (когда layout готов)
+    const raf = requestAnimationFrame(updateFitScale);
 
     const observer = new ResizeObserver(updateFitScale);
     observer.observe(el);
 
-    return () => observer.disconnect();
-  }, [zone]);
+    return () => {
+      cancelAnimationFrame(raf);
+      observer.disconnect();
+    };
+  }, [zone, isLoading]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect

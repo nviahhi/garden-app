@@ -16,6 +16,7 @@ import { PlantSearch } from './components/PlantSearch';
 import { StatsDashboard } from './components/StatsDashboard';
 import { WelcomeScreen } from './components/WelcomeScreen';
 import { GuestBanner } from './components/GuestBanner';
+import { UserBar } from './components/UserBar';
 import { demoApi } from './api/demo';
 import { exportApi } from './api/export';
 import { exportPlantsToPdf } from './utils/pdfExport';
@@ -267,16 +268,11 @@ function App() {
     );
   }
 
-  if (!user) {
-    return (
-      <div className="app-loading">
-        <p>Не удалось инициализировать сессию. Обновите страницу.</p>
-      </div>
-    );
-  }
-
-  // ===== Welcome screen =====
-  if (!welcomeSeen && zones.length === 0) {
+  // Welcome показываем, если:
+  //  - сессии ещё нет (гость создаётся по клику на кнопку),
+  //  ИЛИ
+  //  - сессия есть, но welcome не пройден и данных нет
+  if (!user || (!welcomeSeen && zones.length === 0)) {
     return (
       <WelcomeScreen
         onStart={handleStartFromScratch}
@@ -287,10 +283,7 @@ function App() {
 
   // ===== Приложение =====
   return (
-    <div className="app-root">
-      <GuestBanner />
-
-      <div className="app-layout">
+    <div className="app-layout">
       {sidebarTab === 'containers' ? (
         <ContainerList
           selectedId={selectedId}
@@ -309,6 +302,9 @@ function App() {
       )}
 
       <main className="canvas-area">
+        <UserBar />
+        <GuestBanner />
+
         <ZoneSwitcher
           onSwitch={handleZoneSwitch}
           onCreate={() => setZoneModal({ mode: 'create' })}
@@ -325,15 +321,13 @@ function App() {
           >
             + Новая партия
           </button>
-
           <button
             className="btn btn-ghost"
             onClick={() => setSearchOpen(true)}
             title="Поиск растений (Cmd/Ctrl+K)"
           >
-            🔍 Поиск <kbd>⌘K</kbd>
+            🔍 Поиск
           </button>
-
           <button
             className="btn btn-ghost"
             onClick={handleExportAll}
@@ -342,7 +336,6 @@ function App() {
           >
             {exportingAll ? '⏳ Формирую PDF...' : '📄 Экспорт'}
           </button>
-
           <button
             className="btn btn-ghost"
             onClick={() => setStatsOpen(true)}
@@ -350,7 +343,6 @@ function App() {
           >
             📊 Статистика
           </button>
-
           {hasDemo && (
             <button
               className="btn btn-ghost"
@@ -459,7 +451,6 @@ function App() {
           }}
         />
       )}
-      </div>
     </div>
   );
 }

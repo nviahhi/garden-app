@@ -2,11 +2,12 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db');
 
+// GET /api/stats
 router.get('/', async (req, res) => {
   try {
     const uid = req.user.id;
 
-    // 1. Общие счётчики
+    // ===== 1. Общие счётчики =====
     const totalsResult = await pool.query(`
       SELECT
         (SELECT COUNT(*)::int FROM plants WHERE user_id = $1)      AS plants,
@@ -14,14 +15,17 @@ router.get('/', async (req, res) => {
         (SELECT COUNT(*)::int FROM containers WHERE user_id = $1)  AS containers,
         (SELECT COUNT(*)::int FROM zones WHERE user_id = $1)       AS zones,
         (SELECT COALESCE(SUM(seeds_count), 0)::int FROM batches WHERE user_id = $1) AS total_seeds,
-        (SELECT COUNT(*)::int FROM plants WHERE user_id = $1 AND container_id IS NULL) AS orphans,
+        (SELECT COUNT(*)::int FROM plants
+           WHERE user_id = $1 AND container_id IS NULL)            AS orphans,
+        (SELECT COUNT(*)::int FROM plants
+           WHERE user_id = $1 AND status != 'sown')                AS germinated,
         (SELECT ROUND(AVG(EXTRACT(EPOCH FROM (NOW() - b.sowing_date)) / 86400))::int
            FROM plants p JOIN batches b ON b.id = p.batch_id
            WHERE p.user_id = $1 AND p.status IN ('growing', 'flowering', 'fruiting')
         ) AS avg_age_days
     `, [uid]);
 
-    // 2. По статусам
+    // ===== 2. По статусам =====
     const byStatusResult = await pool.query(`
       SELECT status, COUNT(*)::int AS count
       FROM plants WHERE user_id = $1
@@ -33,20 +37,42 @@ router.get('/', async (req, res) => {
       if (row.status in byStatus) byStatus[row.status] = row.count;
     }
 
-    // 3. Всхожесть по сортам (отсортировано)
+    // ===== 3. Всхожесть по сортам (БЕЗ LEFT JOIN-бага) =====
+    // Считаем семена и растения в двух независимых агрегатах,
+    // потом соединяем их по (species, variety).
     const bySpeciesResult = await pool.query(`
+      WITH batch_stats AS (
+        SELECT
+          species,
+          COALESCE(variety, '') AS variety,
+          SUM(seeds_count)::int AS seeds,
+          COUNT(*)::int AS batches
+        FROM batches
+        WHERE user_id = $1
+        GROUP BY species, variety
+        HAVING SUM(seeds_count) > 0
+      ),
+      plant_stats AS (
+        SELECT
+          b.species,
+          COALESCE(b.variety, '') AS variety,
+          COUNT(p.id)::int AS plants,
+          COUNT(p.id) FILTER (WHERE p.status != 'sown')::int AS germinated
+        FROM plants p
+        JOIN batches b ON b.id = p.batch_id
+        WHERE p.user_id = $1
+        GROUP BY b.species, b.variety
+      )
       SELECT
-        b.species,
-        COALESCE(b.variety, '') AS variety,
-        SUM(b.seeds_count)::int AS seeds,
-        COUNT(DISTINCT b.id)::int AS batches,
-        COUNT(p.id)::int AS plants,
-        COUNT(p.id) FILTER (WHERE p.status != 'sown')::int AS germinated
-      FROM batches b
-      LEFT JOIN plants p ON p.batch_id = b.id
-      WHERE b.user_id = $1
-      GROUP BY b.species, b.variety
-      HAVING SUM(b.seeds_count) > 0
+        bs.species,
+        bs.variety,
+        bs.seeds,
+        bs.batches,
+        COALESCE(ps.plants, 0)::int AS plants,
+        COALESCE(ps.germinated, 0)::int AS germinated
+      FROM batch_stats bs
+      LEFT JOIN plant_stats ps
+        ON ps.species = bs.species AND ps.variety = bs.variety
     `, [uid]);
 
     const bySpecies = bySpeciesResult.rows
@@ -61,7 +87,7 @@ router.get('/', async (req, res) => {
       }))
       .sort((a, b) => b.rate - a.rate || b.germinated - a.germinated);
 
-    // 4. По зонам
+    // ===== 4. По зонам =====
     const byZoneResult = await pool.query(`
       SELECT
         z.id, z.name, z.type,
@@ -75,7 +101,7 @@ router.get('/', async (req, res) => {
       ORDER BY plants DESC, z.name ASC
     `, [uid]);
 
-    // 5. Топ контейнеров
+    // ===== 5. Топ контейнеров =====
     const topContainersResult = await pool.query(`
       SELECT
         c.id, c.name, c.type,
@@ -91,7 +117,7 @@ router.get('/', async (req, res) => {
       LIMIT 5
     `, [uid]);
 
-    // 6. Сорт × зона × контейнер × статус
+    // ===== 6. Сорт × зона × контейнер × статус =====
     const bySpeciesLocationRaw = await pool.query(`
       SELECT
         b.species,
@@ -148,10 +174,14 @@ router.get('/', async (req, res) => {
       }))
       .sort((a, b) => b.total - a.total || a.species.localeCompare(b.species));
 
+    // ===== Ответ =====
     const totals = totalsResult.rows[0];
 
     res.json({
-      totals: { ...totals, byStatus },
+      totals: {
+        ...totals,
+        byStatus,
+      },
       bySpecies,
       bySpeciesLocation,
       byZone: byZoneResult.rows,

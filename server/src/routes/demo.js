@@ -173,14 +173,16 @@ router.post('/seed', async (req, res) => {
       sowingDaysAgo: 25,
       seedsCount: 10,
     });
-    // Взошло 6 из 10 (россыпь → бейджем в кассете)
-    for (let i = 0; i < 6; i++) {
+
+    // Создаём 10 растений: 6 взошли, 4 ещё sown (не взошли)
+    for (let i = 0; i < 10; i++) {
+      const isGerminated = i < 6;
       await createPlant(client, uid, {
         batchId: batchTomatoShelf.id,
         containerId: trayTomato.id,
         number: i + 1,
         cellIndex: null,
-        status: i < 4 ? 'growing' : 'flowering',
+        status: isGerminated ? (i < 4 ? 'growing' : 'flowering') : 'sown',
       });
     }
 

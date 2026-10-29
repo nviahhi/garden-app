@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { AuthModal } from './AuthModal';
+import { useAuthStore } from '../store/useAuthStore';
 
 interface WelcomeScreenProps {
   onStart: () => void;
@@ -7,15 +8,37 @@ interface WelcomeScreenProps {
 }
 
 export function WelcomeScreen({ onStart, onDemo }: WelcomeScreenProps) {
+  const ensureGuest = useAuthStore((s) => s.ensureGuest);
+
   const [authModal, setAuthModal] = useState<'login' | 'signup' | null>(null);
-  const [demoLoading, setDemoLoading] = useState(false);
+  const [loading, setLoading] = useState<'start' | 'demo' | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const busy = loading !== null;
+
+  const handleStart = async () => {
+    setError(null);
+    setLoading('start');
+    try {
+      await ensureGuest();   // ← гость создаётся только здесь
+      onStart();
+    } catch {
+      setError('Не удалось создать сессию. Проверьте соединение и попробуйте снова.');
+    } finally {
+      setLoading(null);
+    }
+  };
 
   const handleDemo = async () => {
-    setDemoLoading(true);
+    setError(null);
+    setLoading('demo');
     try {
+      await ensureGuest();   // ← гость создаётся только здесь
       await onDemo();
+    } catch {
+      setError('Не удалось загрузить демо-данные. Попробуйте ещё раз.');
     } finally {
-      setDemoLoading(false);
+      setLoading(null);
     }
   };
 
@@ -76,9 +99,14 @@ export function WelcomeScreen({ onStart, onDemo }: WelcomeScreenProps) {
         <div className="welcome-actions">
           <button
             className="welcome-btn welcome-btn-primary"
-            onClick={onStart}
+            onClick={handleStart}
+            disabled={busy}
           >
-            <span className="welcome-btn-title">Начать со своих данных</span>
+            <span className="welcome-btn-title">
+              {loading === 'start'
+                ? '⏳ Создаю сессию...'
+                : 'Начать со своих данных'}
+            </span>
             <span className="welcome-btn-hint">
               Создайте первую зону и контейнеры
             </span>
@@ -87,10 +115,12 @@ export function WelcomeScreen({ onStart, onDemo }: WelcomeScreenProps) {
           <button
             className="welcome-btn welcome-btn-secondary"
             onClick={handleDemo}
-            disabled={demoLoading}
+            disabled={busy}
           >
             <span className="welcome-btn-title">
-              {demoLoading ? '⏳ Загружаю...' : '✨ Посмотреть на демо-данных'}
+              {loading === 'demo'
+                ? '⏳ Загружаю демо...'
+                : '✨ Посмотреть на демо-данных'}
             </span>
             <span className="welcome-btn-hint">
               3 зоны, 7 контейнеров, готовые растения
@@ -98,10 +128,13 @@ export function WelcomeScreen({ onStart, onDemo }: WelcomeScreenProps) {
           </button>
         </div>
 
+        {error && <div className="form-error">{error}</div>}
+
         <div className="welcome-footer">
           <button
             className="welcome-link"
             onClick={() => setAuthModal('login')}
+            disabled={busy}
           >
             Уже есть аккаунт? Войти
           </button>
@@ -109,21 +142,24 @@ export function WelcomeScreen({ onStart, onDemo }: WelcomeScreenProps) {
           <button
             className="welcome-link"
             onClick={() => setAuthModal('signup')}
+            disabled={busy}
           >
-            Сразу создать аккаунт
+            Создать аккаунт
           </button>
         </div>
 
         <div className="welcome-contact">
-          <span className="welcome-contact-text">
-            Идеи, пожелания и баг-репорты —{' '}
-          </span>
-          <a
-            className="welcome-contact-link"
-            href="mailto:nadja.viahhi@gmail.com?subject=Журнал%20рассады"
-          >
-            nadja.viahhi@gmail.com
-          </a>
+          <span className="welcome-beta-badge">Бета-версия</span>
+          <p className="welcome-contact-text">
+            Идеи, пожелания и баг-репорты пишите{' '}
+            <a
+              className="welcome-contact-link"
+              href="mailto:nadja.viahhi@gmail.com?subject=Журнал%20рассады"
+            >
+              сюда
+            </a>
+            .
+          </p>
         </div>
       </div>
 
