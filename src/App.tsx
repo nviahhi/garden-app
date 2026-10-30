@@ -86,6 +86,8 @@ function App() {
   useEffect(() => {
     if (selectedPlant) {
       loadPlantWithEvents(selectedPlant.id);
+    } else {
+      useBatchStore.getState().closePlantEvents();
     }
   }, [selectedPlant, loadPlantWithEvents]);
 

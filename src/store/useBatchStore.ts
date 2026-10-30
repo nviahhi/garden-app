@@ -9,6 +9,11 @@ interface BatchState {
   plants: Plant[];
   isLoading: boolean;
 
+  // id растения, для которого панель уже загрузила историю событий.
+  // Нужен, чтобы перезагрузка списка растений не «съедала» историю
+  // и сразу показывала новые события (пересадка, смена статуса).
+  eventsLoadedFor: number | null;
+
   loadBatches: () => Promise<void>;
   loadPlants: () => Promise<void>;
   createBatch: (payload: CreateBatchPayload) => Promise<{ success: boolean; error?: string }>;
@@ -30,12 +35,15 @@ interface BatchState {
     notes: string
   ) => Promise<boolean>;
   loadPlantWithEvents: (id: number) => Promise<Plant | null>;
+  // Закрыть панель растения — перестать автообновлять его историю
+  closePlantEvents: () => void;
 }
 
 export const useBatchStore = create<BatchState>((set, get) => ({
   batches: [],
   plants: [],
   isLoading: false,
+  eventsLoadedFor: null,
 
   loadBatches: async () => {
     set({ isLoading: true });
@@ -50,8 +58,23 @@ export const useBatchStore = create<BatchState>((set, get) => ({
 
   loadPlants: async () => {
     try {
-      const plants = await plantsApi.getAll();
+      const fresh = await plantsApi.getAll();
+
+      // GET /plants не отдаёт события, поэтому перезагрузка списка сносит
+      // историю у открытой панели растения. Сохраняем уже загруженные
+      // события, чтобы панель не «пустела», и обновляем их для открытой
+      // панели — тогда новое событие (пересадка/статус) виден сразу.
+      const previousById = new Map(get().plants.map((p) => [p.id, p]));
+      const plants = fresh.map((p) => {
+        const previous = previousById.get(p.id);
+        return previous?.events ? { ...p, events: previous.events } : p;
+      });
       set({ plants });
+
+      const openPlantId = get().eventsLoadedFor;
+      if (openPlantId != null && plants.some((p) => p.id === openPlantId)) {
+        await get().loadPlantWithEvents(openPlantId);
+      }
     } catch (err) {
       console.error('Ошибка загрузки растений:', err);
     }
@@ -151,6 +174,11 @@ export const useBatchStore = create<BatchState>((set, get) => ({
           p.id === id ? { ...p, ...updated } : p
         ),
       });
+      // Смена статуса пишет событие в историю — обновляем её, если
+      // панель этого растения открыта.
+      if (get().eventsLoadedFor === id) {
+        await get().loadPlantWithEvents(id);
+      }
       return true;
     } catch (err) {
       console.error('Ошибка смены статуса:', err);
@@ -187,6 +215,7 @@ export const useBatchStore = create<BatchState>((set, get) => ({
     try {
       const data = await plantsApi.getOne(id);
       set({
+        eventsLoadedFor: id,
         plants: get().plants.map((p) =>
           p.id === id ? { ...p, events: data.events } : p
         ),
@@ -196,5 +225,9 @@ export const useBatchStore = create<BatchState>((set, get) => ({
       console.error('Ошибка загрузки растения с событиями:', err);
       return null;
     }
+  },
+
+  closePlantEvents: () => {
+    set({ eventsLoadedFor: null });
   },
 }));
