@@ -120,7 +120,7 @@ export function WelcomeScreen({ onStart, onDemo }: WelcomeScreenProps) {
             <span className="welcome-btn-title">
               {loading === 'demo'
                 ? '⏳ Загружаю демо...'
-                : '✨ Посмотреть на демо-данных'}
+                : '✨ Посмотреть на демо-данныe'}
             </span>
             <span className="welcome-btn-hint">
               3 зоны, 7 контейнеров, готовые растения

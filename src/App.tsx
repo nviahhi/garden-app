@@ -17,9 +17,11 @@ import { StatsDashboard } from './components/StatsDashboard';
 import { WelcomeScreen } from './components/WelcomeScreen';
 import { GuestBanner } from './components/GuestBanner';
 import { UserBar } from './components/UserBar';
+import { NewSeasonModal } from './components/NewSeasonModal';
 import { demoApi } from './api/demo';
 import { exportApi } from './api/export';
 import { exportPlantsToPdf } from './utils/pdfExport';
+import { useSeasonStore } from './store/useSeasonStore';
 import { useContainerStore } from './store/useContainerStore';
 import { useBatchStore } from './store/useBatchStore';
 import { useZoneStore } from './store/useZoneStore';
@@ -61,6 +63,7 @@ function App() {
   const [isCreateBatchOpen, setCreateBatchOpen] = useState(false);
   const [isSearchOpen, setSearchOpen] = useState(false);
   const [isStatsOpen, setStatsOpen] = useState(false);
+  const [isNewSeasonOpen, setNewSeasonOpen] = useState(false);
   const [zoneModal, setZoneModal] = useState<ZoneModalState>(null);
   const [exportingAll, setExportingAll] = useState(false);
   const [resettingDemo, setResettingDemo] = useState(false);
@@ -76,10 +79,12 @@ function App() {
   // ===== Загрузка данных после auth =====
   useEffect(() => {
     if (!user) return;
-    loadZones();
-    loadContainers();
-    loadBatches();
-    loadPlants();
+    useSeasonStore.getState().load().then(() => {
+      loadZones();
+      loadContainers();
+      loadBatches();
+      loadPlants();
+    });
   }, [user, loadZones, loadContainers, loadBatches, loadPlants]);
 
   // ===== История выбранного растения =====
@@ -345,6 +350,13 @@ function App() {
           >
             📊 Статистика
           </button>
+          <button
+            className="btn btn-ghost"
+            onClick={() => setNewSeasonOpen(true)}
+            title="Начать новый сезон"
+          >
+            🌱 Новый сезон
+          </button>
           {hasDemo && (
             <button
               className="btn btn-ghost"
@@ -441,6 +453,18 @@ function App() {
 
       {isStatsOpen && (
         <StatsDashboard onClose={() => setStatsOpen(false)} />
+      )}
+
+      {isNewSeasonOpen && (
+        <NewSeasonModal
+          zones={zones}
+          containers={containers}
+          onClose={() => setNewSeasonOpen(false)}
+          onSeasonStarted={() => {
+            setNewSeasonOpen(false);
+            setZoneModal({ mode: 'create' });
+          }}
+        />
       )}
 
       {zoneModal && (

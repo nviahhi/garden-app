@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { zonesApi, type CreateZonePayload } from '../api/zones';
 import type { Zone } from '../types';
+import { isVisibleSince } from '../utils/season';
+import { useSeasonStore } from './useSeasonStore';
 
 interface ZoneState {
   zones: Zone[];
@@ -22,8 +24,15 @@ export const useZoneStore = create<ZoneState>((set, get) => ({
   loadZones: async () => {
     set({ isLoading: true });
     try {
-      const zones = await zonesApi.getAll();
+      const all = await zonesApi.getAll();
+      const seasonStart = useSeasonStore.getState().seasonStart;
+      const zones = all.filter((z) => isVisibleSince(z.created_at, seasonStart));
       set({ zones, isLoading: false });
+
+      // Если выбранной зоны больше нет в текущем сезоне — сбрасываем
+      if (get().currentZone && !zones.some((z) => z.id === get().currentZone!.id)) {
+        set({ currentZone: null });
+      }
 
       // Автовыбор первой зоны, если ничего не выбрано
       if (!get().currentZone && zones.length > 0) {

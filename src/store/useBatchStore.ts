@@ -3,6 +3,8 @@ import axios from 'axios';
 import { batchesApi, type CreateBatchPayload } from '../api/batches';
 import { plantsApi } from '../api/plants';
 import type { Batch, Plant } from '../types';
+import { isVisibleSince } from '../utils/season';
+import { useSeasonStore } from './useSeasonStore';
 
 interface BatchState {
   batches: Batch[];
@@ -48,7 +50,9 @@ export const useBatchStore = create<BatchState>((set, get) => ({
   loadBatches: async () => {
     set({ isLoading: true });
     try {
-      const batches = await batchesApi.getAll();
+      const all = await batchesApi.getAll();
+      const seasonStart = useSeasonStore.getState().seasonStart;
+      const batches = all.filter((b) => isVisibleSince(b.created_at, seasonStart));
       set({ batches, isLoading: false });
     } catch (err) {
       console.error('Ошибка загрузки партий:', err);
@@ -58,7 +62,9 @@ export const useBatchStore = create<BatchState>((set, get) => ({
 
   loadPlants: async () => {
     try {
-      const fresh = await plantsApi.getAll();
+      const all = await plantsApi.getAll();
+      const seasonStart = useSeasonStore.getState().seasonStart;
+      const fresh = all.filter((p) => isVisibleSince(p.created_at, seasonStart));
 
       // GET /plants не отдаёт события, поэтому перезагрузка списка сносит
       // историю у открытой панели растения. Сохраняем уже загруженные
@@ -74,6 +80,9 @@ export const useBatchStore = create<BatchState>((set, get) => ({
       const openPlantId = get().eventsLoadedFor;
       if (openPlantId != null && plants.some((p) => p.id === openPlantId)) {
         await get().loadPlantWithEvents(openPlantId);
+      } else if (openPlantId != null) {
+        // Растение скрыто новым сезоном — больше не обновляем его историю
+        set({ eventsLoadedFor: null });
       }
     } catch (err) {
       console.error('Ошибка загрузки растений:', err);

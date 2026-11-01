@@ -6,31 +6,34 @@ const pool = require('../db');
 router.get('/', async (req, res) => {
   try {
     const uid = req.user.id;
+    const since = req.query.since || null;
 
     // ===== 1. Общие счётчики =====
     const totalsResult = await pool.query(`
       SELECT
-        (SELECT COUNT(*)::int FROM plants WHERE user_id = $1)      AS plants,
-        (SELECT COUNT(*)::int FROM batches WHERE user_id = $1)     AS batches,
-        (SELECT COUNT(*)::int FROM containers WHERE user_id = $1)  AS containers,
-        (SELECT COUNT(*)::int FROM zones WHERE user_id = $1)       AS zones,
-        (SELECT COALESCE(SUM(seeds_count), 0)::int FROM batches WHERE user_id = $1) AS total_seeds,
+        (SELECT COUNT(*)::int FROM plants WHERE user_id = $1 AND ($2::timestamptz IS NULL OR created_at >= $2))      AS plants,
+        (SELECT COUNT(*)::int FROM batches WHERE user_id = $1 AND ($2::timestamptz IS NULL OR created_at >= $2))     AS batches,
+        (SELECT COUNT(*)::int FROM containers WHERE user_id = $1 AND ($2::timestamptz IS NULL OR created_at >= $2))  AS containers,
+        (SELECT COUNT(*)::int FROM zones WHERE user_id = $1 AND ($2::timestamptz IS NULL OR created_at >= $2))       AS zones,
+        (SELECT COALESCE(SUM(seeds_count), 0)::int FROM batches WHERE user_id = $1 AND ($2::timestamptz IS NULL OR created_at >= $2)) AS total_seeds,
         (SELECT COUNT(*)::int FROM plants
-           WHERE user_id = $1 AND container_id IS NULL)            AS orphans,
+           WHERE user_id = $1 AND ($2::timestamptz IS NULL OR created_at >= $2) AND container_id IS NULL)            AS orphans,
         (SELECT COUNT(*)::int FROM plants
-           WHERE user_id = $1 AND status != 'sown')                AS germinated,
+           WHERE user_id = $1 AND ($2::timestamptz IS NULL OR created_at >= $2) AND status != 'sown')                AS germinated,
         (SELECT ROUND(AVG(EXTRACT(EPOCH FROM (NOW() - b.sowing_date)) / 86400))::int
-           FROM plants p JOIN batches b ON b.id = p.batch_id
-           WHERE p.user_id = $1 AND p.status IN ('growing', 'flowering', 'fruiting')
+           FROM plants p
+           JOIN batches b ON b.id = p.batch_id
+           WHERE p.user_id = $1 AND ($2::timestamptz IS NULL OR p.created_at >= $2)
+             AND p.status IN ('growing', 'flowering', 'fruiting')
         ) AS avg_age_days
-    `, [uid]);
+    `, [uid, since]);
 
     // ===== 2. По статусам =====
     const byStatusResult = await pool.query(`
       SELECT status, COUNT(*)::int AS count
-      FROM plants WHERE user_id = $1
+      FROM plants WHERE user_id = $1 AND ($2::timestamptz IS NULL OR created_at >= $2)
       GROUP BY status
-    `, [uid]);
+    `, [uid, since]);
 
     const byStatus = { sown: 0, growing: 0, flowering: 0, fruiting: 0, done: 0 };
     for (const row of byStatusResult.rows) {
@@ -48,7 +51,7 @@ router.get('/', async (req, res) => {
           SUM(seeds_count)::int AS seeds,
           COUNT(*)::int AS batches
         FROM batches
-        WHERE user_id = $1
+        WHERE user_id = $1 AND ($2::timestamptz IS NULL OR created_at >= $2)
         GROUP BY species, variety
         HAVING SUM(seeds_count) > 0
       ),
@@ -60,7 +63,7 @@ router.get('/', async (req, res) => {
           COUNT(p.id) FILTER (WHERE p.status != 'sown')::int AS germinated
         FROM plants p
         JOIN batches b ON b.id = p.batch_id
-        WHERE p.user_id = $1
+        WHERE p.user_id = $1 AND ($2::timestamptz IS NULL OR p.created_at >= $2)
         GROUP BY b.species, b.variety
       )
       SELECT
@@ -73,7 +76,7 @@ router.get('/', async (req, res) => {
       FROM batch_stats bs
       LEFT JOIN plant_stats ps
         ON ps.species = bs.species AND ps.variety = bs.variety
-    `, [uid]);
+    `, [uid, since]);
 
     const bySpecies = bySpeciesResult.rows
       .map((r) => ({
@@ -94,12 +97,12 @@ router.get('/', async (req, res) => {
         COUNT(DISTINCT c.id)::int AS containers,
         COUNT(p.id)::int AS plants
       FROM zones z
-      LEFT JOIN containers c ON c.zone_id = z.id
-      LEFT JOIN plants p ON p.container_id = c.id
-      WHERE z.user_id = $1
+      LEFT JOIN containers c ON c.zone_id = z.id AND ($2::timestamptz IS NULL OR c.created_at >= $2)
+      LEFT JOIN plants p ON p.container_id = c.id AND ($2::timestamptz IS NULL OR p.created_at >= $2)
+      WHERE z.user_id = $1 AND ($2::timestamptz IS NULL OR z.created_at >= $2)
       GROUP BY z.id
       ORDER BY plants DESC, z.name ASC
-    `, [uid]);
+    `, [uid, since]);
 
     // ===== 5. Топ контейнеров =====
     const topContainersResult = await pool.query(`
@@ -108,14 +111,14 @@ router.get('/', async (req, res) => {
         z.name AS zone_name,
         COUNT(p.id)::int AS plants
       FROM containers c
-      LEFT JOIN plants p ON p.container_id = c.id
+      LEFT JOIN plants p ON p.container_id = c.id AND ($2::timestamptz IS NULL OR p.created_at >= $2)
       LEFT JOIN zones z ON z.id = c.zone_id
-      WHERE c.user_id = $1
+      WHERE c.user_id = $1 AND ($2::timestamptz IS NULL OR c.created_at >= $2)
       GROUP BY c.id, z.name
       HAVING COUNT(p.id) > 0
       ORDER BY plants DESC
       LIMIT 5
-    `, [uid]);
+    `, [uid, since]);
 
     // ===== 6. Сорт × зона × контейнер × статус =====
     const bySpeciesLocationRaw = await pool.query(`
@@ -130,10 +133,10 @@ router.get('/', async (req, res) => {
       JOIN batches b ON b.id = p.batch_id
       LEFT JOIN containers c ON c.id = p.container_id
       LEFT JOIN zones z ON z.id = c.zone_id
-      WHERE p.user_id = $1
+      WHERE p.user_id = $1 AND ($2::timestamptz IS NULL OR p.created_at >= $2)
       GROUP BY b.species, b.variety, z.id, z.name, c.id, c.name, p.status
       ORDER BY b.species ASC, b.variety ASC, z.name ASC NULLS LAST, c.name ASC NULLS LAST, p.status
-    `, [uid]);
+    `, [uid, since]);
 
     const bySpeciesLocationMap = new Map();
     for (const row of bySpeciesLocationRaw.rows) {

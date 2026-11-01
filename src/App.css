@@ -2548,3 +2548,87 @@ button {
   background: white;
   border-color: #bf6c00;
 }
+
+/* ===== Season Modal ===== */
+.season-modal {
+  max-width: 480px;
+}
+
+.season-body {
+  padding: 24px;
+}
+
+.season-lead {
+  font-size: 15px;
+  line-height: 1.6;
+  color: #3d3d3d;
+  margin: 0;
+}
+
+.season-stats {
+  display: flex;
+  gap: 24px;
+  margin: 20px 0;
+  padding: 16px;
+  background: #f9f7f2;
+  border-radius: 10px;
+}
+
+.season-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.season-stat-num {
+  font-size: 28px;
+  font-weight: 700;
+  color: #4a7c59;
+}
+
+.season-stat-label {
+  font-size: 12px;
+  color: #8b7355;
+}
+
+.season-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.season-actions .btn:not(.btn-ghost) {
+  flex: 1;
+}
+
+.season-next {
+  margin-top: 6px;
+}
+
+.season-done {
+  text-align: center;
+  padding: 32px 24px;
+}
+
+.season-done-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+}
+
+.season-back-link {
+  margin-top: 16px;
+  font-size: 13px;
+  color: #8b7355;
+  cursor: pointer;
+  background: none;
+  border: none;
+  text-decoration: underline;
+  font-family: inherit;
+  padding: 0;
+}
+
+.season-back-link:hover {
+  color: #4a7c59;
+}

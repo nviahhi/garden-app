@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { containersApi } from '../api/containers';
 import type { Container } from '../types';
+import { isVisibleSince } from '../utils/season';
+import { useSeasonStore } from './useSeasonStore';
 
 interface ContainerState {
   containers: Container[];
@@ -21,7 +23,9 @@ export const useContainerStore = create<ContainerState>((set, get) => ({
   loadContainers: async () => {
     set({ isLoading: true, error: null });
     try {
-      const containers = await containersApi.getAll();
+      const all = await containersApi.getAll();
+      const seasonStart = useSeasonStore.getState().seasonStart;
+      const containers = all.filter((c) => isVisibleSince(c.created_at, seasonStart));
       set({ containers, isLoading: false });
     } catch (err) {
       set({ error: 'Ошибка загрузки контейнеров', isLoading: false });

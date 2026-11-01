@@ -12,6 +12,7 @@ const plantsRouter = require('./routes/plants');
 const statsRouter = require('./routes/stats');
 const exportRouter = require('./routes/export');
 const demoRouter = require('./routes/demo');
+const seasonRouter = require('./routes/season');
 
 const app = express();
 app.use(cors());
@@ -31,6 +32,7 @@ app.use('/api/plants', authRequired, plantsRouter);
 app.use('/api/stats', authRequired, statsRouter);
 app.use('/api/export', authRequired, exportRouter);
 app.use('/api/demo', authRequired, demoRouter);
+app.use('/api/season', authRequired, seasonRouter);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { statsApi } from '../api/stats';
+import { useSeasonStore } from '../store/useSeasonStore';
 import {
   PLANT_STATUS_LABELS,
   PLANT_STATUS_EMOJI,
@@ -32,8 +33,9 @@ export function StatsDashboard({ onClose }: StatsDashboardProps) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const seasonStart = useSeasonStore.getState().seasonStart;
     statsApi
-      .get()
+      .get(seasonStart ?? undefined)
       .then(setStats)
       .catch((err) => {
         console.error(err);
