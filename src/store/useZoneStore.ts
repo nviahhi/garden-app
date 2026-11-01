@@ -14,6 +14,8 @@ interface ZoneState {
   createZone: (payload: CreateZonePayload) => Promise<Zone | null>;
   updateZone: (id: number, payload: Partial<CreateZonePayload>) => Promise<boolean>;
   removeZone: (id: number) => Promise<boolean>;
+  /** Вернуть стор к пустому состоянию (выход из аккаунта). */
+  reset: () => void;
 }
 
 export const useZoneStore = create<ZoneState>((set, get) => ({
@@ -95,5 +97,9 @@ export const useZoneStore = create<ZoneState>((set, get) => ({
       console.error('Ошибка удаления зоны:', err);
       return false;
     }
+  },
+
+  reset: () => {
+    set({ zones: [], currentZone: null, isLoading: false });
   },
 }));

@@ -39,6 +39,8 @@ interface BatchState {
   loadPlantWithEvents: (id: number) => Promise<Plant | null>;
   // Закрыть панель растения — перестать автообновлять его историю
   closePlantEvents: () => void;
+  /** Вернуть стор к пустому состоянию (выход из аккаунта). */
+  reset: () => void;
 }
 
 export const useBatchStore = create<BatchState>((set, get) => ({
@@ -238,5 +240,14 @@ export const useBatchStore = create<BatchState>((set, get) => ({
 
   closePlantEvents: () => {
     set({ eventsLoadedFor: null });
+  },
+
+  reset: () => {
+    set({
+      batches: [],
+      plants: [],
+      isLoading: false,
+      eventsLoadedFor: null,
+    });
   },
 }));

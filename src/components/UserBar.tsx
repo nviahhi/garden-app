@@ -1,8 +1,11 @@
 import { useAuthStore } from '../store/useAuthStore';
 
-export function UserBar() {
+interface UserBarProps {
+  onLogout: () => void;
+}
+
+export function UserBar({ onLogout }: UserBarProps) {
   const user = useAuthStore((s) => s.user);
-  const logout = useAuthStore((s) => s.logout);
 
   // Показываем только для зарегистрированных (не гостей)
   if (!user || user.isAnonymous || !user.email) return null;
@@ -15,7 +18,7 @@ export function UserBar() {
       </span>
       <button
         className="user-bar-logout"
-        onClick={logout}
+        onClick={onLogout}
         title="Выйти из аккаунта"
       >
         Выйти

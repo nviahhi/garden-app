@@ -21,6 +21,7 @@ import { NewSeasonModal } from './components/NewSeasonModal';
 import { demoApi } from './api/demo';
 import { exportApi } from './api/export';
 import { exportPlantsToPdf } from './utils/pdfExport';
+import { resetAllData } from './utils/resetData';
 import { useSeasonStore } from './store/useSeasonStore';
 import { useContainerStore } from './store/useContainerStore';
 import { useBatchStore } from './store/useBatchStore';
@@ -198,6 +199,26 @@ function App() {
     setSelectedPlant(null);
   };
 
+  const handleLogout = () => {
+    useAuthStore.getState().logout();
+    resetAllData();
+
+    setSidebarTab('containers');
+    setSelectedId(null);
+    setSelectedPlant(null);
+    setSelectedBatch(null);
+    setGerminateBatch(null);
+    setTransplantPlant(null);
+    setCreateContainerOpen(false);
+    setCreateBatchOpen(false);
+    setSearchOpen(false);
+    setStatsOpen(false);
+    setNewSeasonOpen(false);
+    setZoneModal(null);
+    setExportingAll(false);
+    setResettingDemo(false);
+  };
+
   const handleExportAll = async () => {
     setExportingAll(true);
     try {
@@ -309,8 +330,8 @@ function App() {
       )}
 
       <main className="canvas-area">
-        <UserBar />
-        <GuestBanner />
+        <UserBar onLogout={handleLogout} />
+        <GuestBanner onLogout={handleLogout} />
 
         <ZoneSwitcher
           onSwitch={handleZoneSwitch}

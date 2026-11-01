@@ -13,6 +13,8 @@ interface ContainerState {
   addContainer: (data: Partial<Container>) => Promise<Container | null>;
   updateContainer: (id: number, data: Partial<Container>) => Promise<void>;
   removeContainer: (id: number) => Promise<void>;
+  /** Вернуть стор к пустому состоянию (выход из аккаунта). */
+  reset: () => void;
 }
 
 export const useContainerStore = create<ContainerState>((set, get) => ({
@@ -39,7 +41,7 @@ export const useContainerStore = create<ContainerState>((set, get) => ({
       set({ containers: [...get().containers, created] });
       return created;
     } catch (err) {
-      console.error('Ошибка создания:', err);
+      console.error('Ошибка удаления:', err);
       return null;
     }
   },
@@ -64,7 +66,11 @@ export const useContainerStore = create<ContainerState>((set, get) => ({
       await containersApi.remove(id);
       set({ containers: get().containers.filter((c) => c.id !== id) });
     } catch (err) {
-      console.error('Ошибка удаления:', err);
+      console.error('Ошибка удаления контейнера:', err);
     }
+  },
+
+  reset: () => {
+    set({ containers: [], isLoading: false, error: null });
   },
 }));

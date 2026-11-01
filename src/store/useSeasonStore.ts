@@ -8,6 +8,8 @@ interface SeasonState {
   load: () => Promise<void>;
   start: () => Promise<boolean>;
   reset: () => Promise<boolean>;
+  /** Вернуть стор к пустому состоянию (выход из аккаунта). */
+  resetAll: () => void;
 }
 
 export const useSeasonStore = create<SeasonState>((set) => ({
@@ -45,5 +47,9 @@ export const useSeasonStore = create<SeasonState>((set) => ({
       console.error('Ошибка сброса сезона:', err);
       return false;
     }
+  },
+
+  resetAll: () => {
+    set({ seasonStart: null, isLoading: false });
   },
 }));

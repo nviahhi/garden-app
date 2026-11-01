@@ -2,16 +2,19 @@ import { useState } from 'react';
 import { useAuthStore } from '../store/useAuthStore';
 import { AuthModal } from './AuthModal';
 
-export function GuestBanner() {
+interface GuestBannerProps {
+  onLogout: () => void;
+}
+
+export function GuestBanner({ onLogout }: GuestBannerProps) {
   const user = useAuthStore((s) => s.user);
-  const logout = useAuthStore((s) => s.logout);
   const [showAuth, setShowAuth] = useState(false);
 
   if (!user?.isAnonymous) return null;
 
   const handleLogout = () => {
     if (confirm('Выйти и начать заново? Текущие данные останутся в системе, но недоступны без токена.')) {
-      logout();
+      onLogout();
     }
   };
 
