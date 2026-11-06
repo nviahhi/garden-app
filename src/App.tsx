@@ -18,6 +18,7 @@ import { WelcomeScreen } from './components/WelcomeScreen';
 import { GuestBanner } from './components/GuestBanner';
 import { UserBar } from './components/UserBar';
 import { NewSeasonModal } from './components/NewSeasonModal';
+import { AiAdvisorModal } from './components/AiAdvisorModal';
 import { demoApi } from './api/demo';
 import { exportApi } from './api/export';
 import { exportPlantsToPdf } from './utils/pdfExport';
@@ -65,6 +66,7 @@ function App() {
   const [isSearchOpen, setSearchOpen] = useState(false);
   const [isStatsOpen, setStatsOpen] = useState(false);
   const [isNewSeasonOpen, setNewSeasonOpen] = useState(false);
+  const [isAiOpen, setAiOpen] = useState(false);
   const [zoneModal, setZoneModal] = useState<ZoneModalState>(null);
   const [exportingAll, setExportingAll] = useState(false);
   const [resettingDemo, setResettingDemo] = useState(false);
@@ -378,6 +380,13 @@ function App() {
           >
             🌱 Новый сезон
           </button>
+          <button
+            className="btn btn-ghost"
+            onClick={() => setAiOpen(true)}
+            title="Совет ИИ"
+          >
+            🤖 Совет ИИ
+          </button>
           {hasDemo && (
             <button
               className="btn btn-ghost"
@@ -486,6 +495,10 @@ function App() {
             setZoneModal({ mode: 'create' });
           }}
         />
+      )}
+
+      {isAiOpen && (
+        <AiAdvisorModal onClose={() => setAiOpen(false)} />
       )}
 
       {zoneModal && (
