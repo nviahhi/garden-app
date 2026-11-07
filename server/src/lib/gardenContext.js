@@ -130,6 +130,23 @@ async function buildContext(userId, seasonStart) {
       )
   `, params);
 
+  // Сами события — без них модель видит только цифру и додумывает детали
+  const eventsList = await pool.query(`
+    SELECT e.event_type,
+           to_char(e.event_date, 'YYYY-MM-DD') AS dt,
+           p.number AS plant_num,
+           b.species, COALESCE(b.variety, '') AS variety,
+           COALESCE(e.notes, '') AS notes,
+           COALESCE(e.from_status, '') AS from_status,
+           COALESCE(e.to_status, '') AS to_status
+    FROM plant_events e
+    JOIN plants p ON p.id = e.plant_id
+    LEFT JOIN batches b ON b.id = p.batch_id
+    WHERE p.user_id = $1 AND p.created_at >= ${since}
+    ORDER BY e.event_date DESC, e.id DESC
+    LIMIT 25
+  `, params);
+
   // ===== 6. Заполненность контейнеров =====
   const containerUse = await pool.query(`
     SELECT c.name, c.type, c.width, c.height, c.cols, c.rows, z.px_per_cm,
@@ -256,21 +273,45 @@ async function buildContext(userId, seasonStart) {
     lines.push(``);
   }
 
-  // Уход / события
-  lines.push(`Уход за сезон: событий ${eventsCount.rows[0].total}`);
+  // ===== Уход =====
+  const eventLabels = {
+    water: 'Полив',
+    transplant: 'Пересадка',
+    note: 'Заметка',
+    measure: 'Замер',
+    status_change: 'Смена статуса',
+  };
+
+  const totalEvents = eventsCount.rows[0].total;
+  lines.push(`Всего событий за сезон: ${totalEvents}`);
+
+  // Полив — отдельно, чтобы модель не смешивала «нет поливов» и «нет событий»
+  const waterEvents = eventsList.rows.filter((r) => r.event_type === 'water');
   if (lastWater.rows[0].last_date) {
     const days = Math.floor(
       (Date.now() - new Date(lastWater.rows[0].last_date).getTime()) / 86400000
     );
-    lines.push(`Последний зафиксированный полив: ${days} дн. назад`);
+    lines.push(`Поливов: ${waterEvents.length}, последний ${days} дн. назад`);
   } else {
-    lines.push(`Поливы не фиксировались ни разу`);
+    lines.push(`Поливов не зафиксировано ни одного`);
+    if (noWater.rows[0].total > 0) {
+      lines.push(`⚠ Растений без записей о поливе: ${noWater.rows[0].total}`);
+    }
   }
-  if (noWater.rows[0].total > 0) {
-    lines.push(`⚠ Растений без единой записи о поливе: ${noWater.rows[0].total}`);
-  }
-  if (eventsCount.rows[0].total === 0) {
-    lines.push(`⚠ История ухода пуста — нельзя судить о поливах и пересадках`);
+
+  if (eventsList.rows.length > 0) {
+    lines.push(`Последние события (тип, дата, растение, детали):`);
+    for (const r of eventsList.rows) {
+      const label = eventLabels[r.event_type] || r.event_type;
+      const plant = `#${r.plant_num} ${r.species}${r.variety ? ` «${r.variety}»` : ''}`;
+      const detail = [
+        r.notes ? `текст: «${r.notes}»` : null,
+        r.from_status && r.to_status ? `статус: ${r.from_status}→${r.to_status}` : null,
+      ].filter(Boolean).join(' | ');
+      lines.push(`  ${r.dt} · ${label} · ${plant}${detail ? ' · ' + detail : ''}`);
+    }
+  } else {
+    lines.push(`Событий нет вообще`);
   }
   lines.push(``);
 

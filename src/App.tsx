@@ -346,12 +346,6 @@ function App() {
 
         <div className="canvas-toolbar">
           <button
-            className="btn btn-primary"
-            onClick={() => setCreateBatchOpen(true)}
-          >
-            + Новая партия
-          </button>
-          <button
             className="btn btn-ghost"
             onClick={() => setSearchOpen(true)}
             title="Поиск растений (Cmd/Ctrl+K)"
@@ -381,7 +375,7 @@ function App() {
             🌱 Новый сезон
           </button>
           <button
-            className="btn btn-ghost"
+            className="btn btn-primary"
             onClick={() => setAiOpen(true)}
             title="Совет ИИ"
           >
